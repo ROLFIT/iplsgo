@@ -15,7 +15,12 @@ import (
 	"gopkg.in/goracle.v1/oracle"
 )
 
-//ВАЖНО - собирать с GODEBUG=cgocheck=0
+/*
+	ВАЖНО собирать с set
+	GODEBUG=cgocheck=0
+	CGO_CFLAGS=-ID:\oracle\instantclient_12_1\sdk\include
+	CGO_LDFLAGS=-LD:\oracle\instantclient_12_1\sdk\lib -loci
+*/
 var (
 	healthy int32
 )
