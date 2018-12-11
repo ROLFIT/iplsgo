@@ -15,7 +15,12 @@ import (
 	"gopkg.in/goracle.v1/oracle"
 )
 
-//ВАЖНО - собирать с GODEBUG=cgocheck=0
+/*
+	ВАЖНО собирать с set
+	GODEBUG=cgocheck=0
+	CGO_CFLAGS=-ID:\oracle\instantclient_12_1\sdk\include
+	CGO_LDFLAGS=-LD:\oracle\instantclient_12_1\sdk\lib -loci
+*/
 var (
 	logger     service.Logger
 	loggerLock sync.Mutex
@@ -84,6 +89,8 @@ func (p *program) Stop(s service.Service) error {
 //   Handle service controls (optional).
 //   Run the service.
 func main() {
+	//os.Setenv("GODEBUG", "cgocheck=0")
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	oracle.IsDebug = false
 
@@ -94,6 +101,7 @@ func main() {
 	if *verFlag == true {
 		fmt.Println("Version: ", VERSION)
 		fmt.Println("Build:   ", BUILD_DATE)
+		fmt.Println("GODEBUG:", os.Getenv("GODEBUG"))
 		os.Exit(0)
 	}
 

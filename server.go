@@ -291,12 +291,14 @@ func parseConfig(buf []byte) error {
 						c.Handlers[k].ParamStoreProc, c.Handlers[k].DocumentTable,
 						templates, grps)
 
+					newRouter.HEAD(upath+"/*proc", f)
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
 
 			case "SOAP":
 				{
+					newRouter.HEAD(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
 					newRouter.GET(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
 					newRouter.POST(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
 				}

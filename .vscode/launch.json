@@ -1,0 +1,61 @@
+{
+    // Используйте IntelliSense, чтобы узнать о возможных атрибутах.
+    // Наведите указатель мыши, чтобы просмотреть описания существующих атрибутов.
+    // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "iplsgo -version",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${fileDirname}",
+            "env": {
+                "GODEBUG":"cgocheck=0",
+                "CGO_CFLAGS":"-ID:\\oracle\\instantclient_12_1\\sdk\\include",
+                "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
+            },
+            "args": [
+                "-version"
+            ]
+        },
+        {
+            "name": "iplsgo -debug",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {
+                "GODEBUG":"cgocheck=0",
+                "CGO_CFLAGS":"-ID:\\oracle\\instantclient_12_1\\sdk\\include",
+                "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
+            },
+            "args": [
+                "-dsn=iplsql_reader/1@dp-se-tst15",
+                "-conf=COMMON",
+                "-conf_tm=10",
+                "-host=DP-ASW3",
+                "-cs=DP-SE-TST15"
+            ]
+        },
+        {
+            "name": "iplsgo -test",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}",
+            "env": {
+                "GODEBUG":"cgocheck=0",
+                "CGO_CFLAGS":"-ID:\\oracle\\instantclient_12_1\\sdk\\include",
+                "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
+            },
+            "args": [
+                "-dsn=iplsql_reader/1@dp-se-tst15",
+                "-conf=COMMON",
+                "-conf_tm=10",
+                "-host=DP-ASW3",
+                "-cs=DP-SE-TST15"
+            ]
+        }
+    ]
+}
