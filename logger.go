@@ -121,13 +121,13 @@ func (l *loggedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		url = url + "?" + params
 	}
 
-	writeToLog(fmt.Sprintf("%s, %20s, %s, %s, %12d, %12d, %8d, %d, %s, %s, %v\r\n",
+	writeToLog(fmt.Sprintf("%s, %s, %20s, %s, %s, %12d, %12d, %8d, %d, %s, %s, %v\r\n",
+		r.Host,
 		r.RemoteAddr,
 		user,
 		end.Format("2006.01.02"),
 		end.Format("15:04:05.000000000"),
 		//r.Proto,
-		//r.Host,
 		length,
 		r.ContentLength,
 		time.Since(start)/time.Millisecond,

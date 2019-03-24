@@ -65,17 +65,17 @@ type sc struct {
 }
 
 var (
-	test_dsn       = flag.String("test-dsn", "", "Test Oracle DSN (user/passw@sid)")
-	test_dsn_user  string
-	test_dsn_passw string
-	test_dsn_sid   string
-	serverconf     sc
+	testDsn      = flag.String("test-dsn", "", "Test Oracle DSN (user/passw@sid)")
+	testDsnUser  string
+	testDsnPassw string
+	testDsnSID   string
+	serverConf   sc
 )
 
 func init() {
 	flag.Parse()
-	test_dsn_user, test_dsn_passw, test_dsn_sid = oracle.SplitDSN(*test_dsn)
-	serverconf = sc{
+	testDsnUser, testDsnPassw, testDsnSID = oracle.SplitDSN(*testDsn)
+	serverConf = sc{
 		ServiceName:      "ServiceName",
 		ServiceDispName:  "ServiceDispName",
 		HTTPPort:         9977,
@@ -95,7 +95,7 @@ func init() {
 				Name      string
 				IsSpecial bool
 				GRP_ID    int32
-			}{test_dsn_user, false, 1},
+			}{testDsnUser, false, 1},
 			struct {
 				Name      string
 				IsSpecial bool
@@ -139,7 +139,7 @@ func init() {
 					struct {
 						ID  int32
 						SID string
-					}{1, test_dsn_sid},
+					}{1, testDsnSID},
 				},
 			},
 			VD{
@@ -149,8 +149,8 @@ func init() {
 				SessionWaitTimeout: 10000,
 				RequestUserInfo:    false,
 				RequestUserRealm:   "/ti8_a",
-				DefUserName:        test_dsn_user,
-				DefUserPass:        test_dsn_passw,
+				DefUserName:        testDsnUser,
+				DefUserPass:        testDsnPassw,
 				BeforeScript:       "session_init.init;",
 				AfterScript:        "",
 				ParamStoreProc:     "wex.ws",
@@ -168,27 +168,27 @@ func init() {
 					struct {
 						ID  int32
 						SID string
-					}{1, test_dsn_sid},
+					}{1, testDsnSID},
 				},
 			},
 			VD{
 				Path:         "/soap",
 				Type:         "SOAP",
-				SoapUserName: test_dsn_user,
-				SoapUserPass: test_dsn_passw,
-				SoapConnStr:  test_dsn_sid,
+				SoapUserName: testDsnUser,
+				SoapUserPass: testDsnPassw,
+				SoapConnStr:  testDsnSID,
 			},
 		},
 	}
 }
 
 func exec(stm string) error {
-	if !(*test_dsn != "") {
+	if !(*testDsn != "") {
 		return errgo.New("cannot test connection without dsn!")
 	}
 
 	var err error
-	conn, err := oracle.NewConnection(test_dsn_user, test_dsn_passw, test_dsn_sid, false)
+	conn, err := oracle.NewConnection(testDsnUser, testDsnPassw, testDsnSID, false)
 	if err != nil {
 		return errgo.New("cannot create connection: " + err.Error())
 	}
@@ -225,7 +225,7 @@ func performRequest(t *testing.T, method, username, password, urlStr, body, resp
 }
 
 const (
-	stm_create_p = `
+	stmCreatePrc = `
 create or replace procedure %s(ap in %s) is 
 begin
   htp.set_ContentType('text/plain');
@@ -259,12 +259,12 @@ func TestServe(t *testing.T) {
 		{"GET", "/", "", "", "", "<a href=\"/images\">Moved Permanently</a>.", http.StatusMovedPermanently},
 		{"GET", "/ti8_a/a.server_test?ap=1", "", "", "", "1", http.StatusOK},
 		{"GET", "/ti8_a/sfsfsf/a.server_test?ap=1", "", "", "", "1", http.StatusOK},
-		{"POST", "/ti8/a.server_test", test_dsn_user, test_dsn_passw, data.Encode(), data.Get("ap"), http.StatusOK},
-		{"POST", "/tI8/a.server_test", test_dsn_user, test_dsn_passw, data.Encode(), data.Get("ap"), http.StatusOK},
+		{"POST", "/ti8/a.server_test", testDsnUser, testDsnPassw, data.Encode(), data.Get("ap"), http.StatusOK},
+		{"POST", "/tI8/a.server_test", testDsnUser, testDsnPassw, data.Encode(), data.Get("ap"), http.StatusOK},
 		{"GET", "/debug/conf/users", "", "", "", "{\"A\":{\"IsSpecial\":false,\"GrpID\":1},\"USER001\":{\"IsSpecial\":false,\"GrpID\":1}}", http.StatusOK},
 	}
 
-	buf, err := json.Marshal(serverconf)
+	buf, err := json.Marshal(serverConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestServe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = exec(fmt.Sprintf(stm_create_p, "server_test", "varchar2"))
+	err = exec(fmt.Sprintf(stmCreatePrc, "server_test", "varchar2"))
 	if err != nil {
 		t.Fatalf("%s - Error when create procedure \"%s\": %s", "varchar2", "server_test", err.Error())
 	}
@@ -286,7 +286,6 @@ func TestServe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s - Error when drop procedure \"%s\": %s", "varchar2", "server_test", err.Error())
 	}
-
 }
 
 func TestExpandFileName(t *testing.T) {
@@ -297,11 +296,11 @@ func TestExpandFileName(t *testing.T) {
 	}{
 		{"${APP_DIR}", basePath},
 		{"${LOG_DIR}", basePath + "\\log\\"},
-		{"${SERVICE_NAME}", fmt.Sprintf("%s_%d", serverconf.ServiceName, serverconf.HTTPPort)},
+		{"${SERVICE_NAME}", fmt.Sprintf("%s_%d", serverConf.ServiceName, serverConf.HTTPPort)},
 		{"${DATE}", time.Now().Format("2006_01_02")},
 	}
 
-	buf, err := json.Marshal(serverconf)
+	buf, err := json.Marshal(serverConf)
 	if err != nil {
 		t.Fatal(err)
 	}

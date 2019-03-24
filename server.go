@@ -26,7 +26,7 @@ import (
 	"github.com/vsdutka/iplsgo/otasker"
 	"github.com/vsdutka/metrics"
 	"github.com/vsdutka/mltpart"
-	"github.com/vsdutka/nspercent-encoding"
+	NSPercentEncoding "github.com/vsdutka/nspercent-encoding"
 )
 
 const (
@@ -224,6 +224,7 @@ func resetConfig() {
 	router = httprouter.New()
 	prevConf = []byte{}
 }
+
 func parseConfig(buf []byte) error {
 	if bytes.Equal(prevConf, buf) {
 		return nil
@@ -254,7 +255,6 @@ func parseConfig(buf []byte) error {
 			case "Redirect":
 				{
 					newRouter.GET(upath, newRedirect(c.Handlers[k].RedirectPath))
-
 				}
 			case "Static":
 				{
@@ -282,27 +282,42 @@ func parseConfig(buf []byte) error {
 						grps[v1.ID] = v1.SID
 					}
 
-					f := newOwa(upath, typeTasker,
+					f := newOwa(
+						upath,
+						typeTasker,
 						time.Duration(c.Handlers[k].SessionIdleTimeout)*time.Millisecond,
 						time.Duration(c.Handlers[k].SessionWaitTimeout)*time.Millisecond,
-						c.Handlers[k].RequestUserInfo, c.Handlers[k].RequestUserRealm,
-						c.Handlers[k].DefUserName, c.Handlers[k].DefUserPass,
-						c.Handlers[k].BeforeScript, c.Handlers[k].AfterScript,
-						c.Handlers[k].ParamStoreProc, c.Handlers[k].DocumentTable,
-						templates, grps)
+						c.Handlers[k].RequestUserInfo,
+						c.Handlers[k].RequestUserRealm,
+						c.Handlers[k].DefUserName,
+						c.Handlers[k].DefUserPass,
+						c.Handlers[k].BeforeScript,
+						c.Handlers[k].AfterScript,
+						c.Handlers[k].ParamStoreProc,
+						c.Handlers[k].DocumentTable,
+						templates,
+						grps)
 
-					newRouter.HEAD(upath+"/*proc", f)
+					if *routerHeadFlag == true {
+						newRouter.HEAD(upath+"/*proc", f)
+					}
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
-
 			case "SOAP":
 				{
-					newRouter.HEAD(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
-					newRouter.GET(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
-					newRouter.POST(upath+"/*proc", newSoap(upath, c.Handlers[k].SoapUserName, c.Handlers[k].SoapUserPass, c.Handlers[k].SoapConnStr))
-				}
+					f := newSoap(
+						upath,
+						c.Handlers[k].SoapUserName,
+						c.Handlers[k].SoapUserPass,
+						c.Handlers[k].SoapConnStr)
 
+					if *routerHeadFlag == true {
+						newRouter.HEAD(upath+"/*proc", f)
+					}
+					newRouter.GET(upath+"/*proc", f)
+					newRouter.POST(upath+"/*proc", f)
+				}
 			}
 		}
 		//		newRouter.GET("/debug/conf/server", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -387,6 +402,7 @@ func confServer(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(buf)
 }
+
 func confUsers(w http.ResponseWriter, r *http.Request) {
 	buf, err := getUsers()
 	if err != nil {
@@ -404,16 +420,25 @@ func newRedirect(redirectPath string) func(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func newOwa(pathStr string, typeTasker int, sessionIdleTimeout, sessionWaitTimeout time.Duration, requestUserInfo bool,
-	requestUserRealm, defUserName, defUserPass, beforeScript,
-	afterScript, paramStoreProc, documentTable string,
-	templates map[string]string, grps map[int32]string,
+func newOwa(
+	pathStr string,
+	typeTasker int,
+	sessionIdleTimeout,
+	sessionWaitTimeout time.Duration,
+	requestUserInfo bool,
+	requestUserRealm,
+	defUserName,
+	defUserPass,
+	beforeScript,
+	afterScript,
+	paramStoreProc,
+	documentTable string,
+	templates map[string]string,
+	grps map[int32]string,
 ) func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 		r.URL.RawQuery = NSPercentEncoding.FixNonStandardPercentEncoding(r.URL.RawQuery)
-		//dirName, procName := filepath.Split(path.Clean(r.URL.Path[len(pathStr):]))
 		procName := path.Clean(r.URL.Path[len(pathStr)+1:])
 
 		vpath := pathStr
@@ -426,7 +451,7 @@ func newOwa(pathStr string, typeTasker int, sessionIdleTimeout, sessionWaitTimeo
 				otasker.Collect(vpath, sortKeyName, false)})
 			return
 		}
-		// -- //
+
 		userName, userPass, ok := r.BasicAuth()
 
 		remoteUser := userName
@@ -451,24 +476,7 @@ func newOwa(pathStr string, typeTasker int, sessionIdleTimeout, sessionWaitTimeo
 
 		var isSpecial bool
 		isSpecial, connStr := getConnectionParams(userName, grps)
-		//		isSpecial, connStr := func(user string) (bool, string) {
-		//			if user == "" {
-		//				return false, ""
-		//			}
-		//			isSpecial, grpID, ok := getUserInfo(user)
-		//			if !ok {
-		//				return false, ""
-		//			}
-		//			// Получаем глобальную строку соединения для ВСЕХ пользователей
-		//			sid := *conectionString
-		//			// если она пустая, ищем среди данных конфигурации
-		//			if sid == "" {
-		//				if sid, ok = grps[grpID]; !ok {
-		//					return false, ""
-		//				}
-		//			}
-		//			return isSpecial, sid
-		//		}(userName)
+
 		if connStr == "" {
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
 			w.WriteHeader(http.StatusUnauthorized)
@@ -501,10 +509,25 @@ func newOwa(pathStr string, typeTasker int, sessionIdleTimeout, sessionWaitTimeo
 			sessionIdleTimeout = math.MaxInt64
 		}
 
-		res := otasker.Run(vpath, typeTasker, sessionID, taskID, userName, userPass, connStr,
-			paramStoreProc, beforeScript, afterScript, documentTable,
-			cgiEnv, procName, procParams, reqFiles,
-			sessionWaitTimeout, sessionIdleTimeout, dumpFileName)
+		res := otasker.Run(
+			vpath,
+			typeTasker,
+			sessionID,
+			taskID,
+			userName,
+			userPass,
+			connStr,
+			paramStoreProc,
+			beforeScript,
+			afterScript,
+			documentTable,
+			cgiEnv,
+			procName,
+			procParams,
+			reqFiles,
+			sessionWaitTimeout,
+			sessionIdleTimeout,
+			dumpFileName)
 
 		switch res.StatusCode {
 		case otasker.StatusErrorPage:
@@ -580,7 +603,6 @@ func newOwa(pathStr string, typeTasker int, sessionIdleTimeout, sessionWaitTimeo
 							}
 						}
 					}
-
 				}
 				if (res.StatusCode == http.StatusMovedPermanently) || (res.StatusCode == http.StatusFound) {
 					http.Redirect(w, r, location, res.StatusCode)

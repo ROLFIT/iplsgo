@@ -23,18 +23,18 @@ var (
 const fmtReaderFileName = "./reader.log"
 
 var (
-	stopChan        = make(chan struct{})
-	stoppedChan     = make(chan struct{})
-	conn            *oracle.Connection
-	reader_username string
-	reader_password string
-	reader_sid      string
-	configname      string
-	hostname        string
+	stopChan       = make(chan struct{})
+	stoppedChan    = make(chan struct{})
+	conn           *oracle.Connection
+	readerUsername string
+	readerPassword string
+	readerSID      string
+	configname     string
+	hostname       string
 )
 
 func initReading(dsn, configName string) error {
-	reader_username, reader_password, reader_sid = oracle.SplitDSN(dsn)
+	readerUsername, readerPassword, readerSID = oracle.SplitDSN(dsn)
 	configname = configName
 	var err error
 	hostname = *hostFlag
@@ -145,8 +145,8 @@ func readConfig() ([]byte, error) {
 		}
 	}
 	if conn == nil {
-		logInfof("Try to login %s@%s\n", reader_username, reader_sid)
-		conn, err = oracle.NewConnection(reader_username, reader_password, reader_sid, false)
+		logInfof("Try to login %s@%s\n", readerUsername, readerSID)
+		conn, err = oracle.NewConnection(readerUsername, readerPassword, readerSID, false)
 		if err != nil {
 			// Выходим. Прочитать не получиться
 			if conn != nil {
@@ -171,11 +171,11 @@ func readConfig() ([]byte, error) {
 	}
 	buf := make([]byte, 0, len(rows)*4000)
 	for k := range rows {
-		config_line, ok := rows[k][0].(string)
+		configLine, ok := rows[k][0].(string)
 		if !ok {
 			return nil, errgo.Newf("data is not String, but %T", rows[k][0])
 		}
-		buf = append(buf, []byte(config_line)...)
+		buf = append(buf, []byte(configLine)...)
 	}
 	if bytes.Equal(buf, []byte("{}")) {
 		return nil, errgo.Newf("Configuration \"%s\" does not exists", configname)

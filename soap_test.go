@@ -53,7 +53,7 @@ func TestSoap(t *testing.T) {
 		{"POST", "/soap/soap", http.Header{"SOAPAction": []string{"ActionGet"}}, "BODY", "BODY", http.StatusOK},
 	}
 
-	buf, err := json.Marshal(serverconf)
+	buf, err := json.Marshal(serverConf)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,6 +35,7 @@ func logInfof(format string, a ...interface{}) error {
 	}
 	return nil
 }
+
 func logError(v ...interface{}) error {
 	loggerLock.Lock()
 	defer loggerLock.Unlock()
@@ -62,6 +63,7 @@ func (p *program) Start(s service.Service) error {
 	go p.run()
 	return nil
 }
+
 func (p *program) run() {
 	startServer()
 	logInfof("Service \"%s\" is started.", confServiceDispName)
@@ -72,6 +74,7 @@ func (p *program) run() {
 		}
 	}
 }
+
 func (p *program) Stop(s service.Service) error {
 	// Any work in Stop should be quick, usually a few seconds at most.
 	logInfof("Service \"%s\" is stopping.", confServiceDispName)
@@ -89,8 +92,6 @@ func (p *program) Stop(s service.Service) error {
 //   Handle service controls (optional).
 //   Run the service.
 func main() {
-	//os.Setenv("GODEBUG", "cgocheck=0")
-
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	oracle.IsDebug = false
 
@@ -99,9 +100,8 @@ func main() {
 	flag.Parse()
 
 	if *verFlag == true {
-		fmt.Println("Version: ", VERSION)
-		fmt.Println("Build:   ", BUILD_DATE)
-		fmt.Println("GODEBUG:", os.Getenv("GODEBUG"))
+		fmt.Println("Version: ", Version)
+		fmt.Println("Build:   ", BuildDate)
 		os.Exit(0)
 	}
 
@@ -131,6 +131,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	errs := make(chan error, 5)
 	func() {
 		loggerLock.Lock()
@@ -158,6 +159,7 @@ func main() {
 		}
 		return
 	}
+
 	err = s.Run()
 	if err != nil {
 		logError(err)

@@ -31,11 +31,31 @@
                 "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
             },
             "args": [
-                "-dsn=iplsql_reader/1@dp-se-tst15",
+                "-dsn=iplsql_reader/1@dp-se-tst17",
                 "-conf=COMMON",
                 "-conf_tm=10",
                 "-host=DP-ASW3",
-                "-cs=DP-SE-TST15"
+                "-cs=DP-SE-TST17"
+            ]
+        },
+        {
+            "name": "iplsgo head -debug",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {
+                "GODEBUG":"cgocheck=0",
+                "CGO_CFLAGS":"-ID:\\oracle\\instantclient_12_1\\sdk\\include",
+                "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
+            },
+            "args": [
+                "-dsn=iplsql_reader/1@dp-se-tst17",
+                "-conf=COMMON",
+                "-conf_tm=10",
+                "-host=DP-ASW3",
+                "-cs=DP-SE-TST17",
+                "-routerHead"
             ]
         },
         {
@@ -50,11 +70,11 @@
                 "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
             },
             "args": [
-                "-dsn=iplsql_reader/1@dp-se-tst15",
+                "-dsn=iplsql_reader/1@dp-se-tst17",
                 "-conf=COMMON",
                 "-conf_tm=10",
                 "-host=DP-ASW3",
-                "-cs=DP-SE-TST15"
+                "-cs=DP-SE-TST17"
             ]
         }
     ]

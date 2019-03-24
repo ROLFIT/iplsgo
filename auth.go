@@ -12,6 +12,7 @@ import (
 	"github.com/vsdutka/iplsgo/auth/ntlm"
 )
 
+// Authenticator is a function
 func Authenticator(authType int,
 	authRealm, defUserName, defUserPass, authNTLMDBUserName, authNTLMDBUserPass string,
 	grps map[int32]string,
