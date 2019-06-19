@@ -298,7 +298,7 @@ func parseConfig(buf []byte) error {
 						templates,
 						grps)
 
-					if *routerHeadFlag == true {
+					if routerHeadFlag != nil && *routerHeadFlag == true {
 						newRouter.HEAD(upath+"/*proc", f)
 					}
 					newRouter.GET(upath+"/*proc", f)
@@ -312,7 +312,7 @@ func parseConfig(buf []byte) error {
 						c.Handlers[k].SoapUserPass,
 						c.Handlers[k].SoapConnStr)
 
-					if *routerHeadFlag == true {
+					if routerHeadFlag != nil && *routerHeadFlag == true {
 						newRouter.HEAD(upath+"/*proc", f)
 					}
 					newRouter.GET(upath+"/*proc", f)
@@ -374,7 +374,13 @@ func parseConfig(buf []byte) error {
 		updateUsers(c.HTTPUsers)
 		// -- //
 		router = newRouter
-		// -- //
+
+		// TODO: copy так не работает -- надо сначала выделить память
+		// в prevConf
+		//
+		// А лучше полностью изменить механизм кеширования: отслеживать измене-
+		// ния данных в базе с помощью триггера, здесь достаточно сравнивать
+		// версии или даты последнего изменения данных
 		copy(prevConf, buf)
 	}()
 	return nil

@@ -62,6 +62,8 @@ func updateUsers(users []byte) {
 			ulock.Lock()
 			defer ulock.Unlock()
 
+			// TODO: copy так не работает -- надо сначала выделить память
+			// в prev
 			copy(prev, users)
 
 			for k := range ulist {
