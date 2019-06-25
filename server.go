@@ -298,9 +298,6 @@ func parseConfig(buf []byte) error {
 						templates,
 						grps)
 
-					if routerHeadFlag != nil && *routerHeadFlag == true {
-						newRouter.HEAD(upath+"/*proc", f)
-					}
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
@@ -312,9 +309,6 @@ func parseConfig(buf []byte) error {
 						c.Handlers[k].SoapUserPass,
 						c.Handlers[k].SoapConnStr)
 
-					if routerHeadFlag != nil && *routerHeadFlag == true {
-						newRouter.HEAD(upath+"/*proc", f)
-					}
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
