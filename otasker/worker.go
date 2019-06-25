@@ -130,7 +130,6 @@ func (h *hr) WorkerStopped(w *worker) {
 
 var (
 	wlock         sync.RWMutex
-	wlist         = make(map[string]map[string]*worker)
 	managersTasks = make(map[string]map[string]*managerTasks)
 )
 

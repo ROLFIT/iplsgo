@@ -127,8 +127,10 @@ func Collect(path, sortKeyName string, reversed bool) OracleTaskersStats {
 	res := make(OracleTaskersStats, 0)
 	wlock.RLock()
 	defer wlock.RUnlock()
-	for _, v := range wlist[strings.ToUpper(path)] {
-		res = append(res, v.info(sortKeyName))
+	for _, mTasks := range managersTasks[strings.ToUpper(path)] {
+		for v := range mTasks.manager.workers {
+			res = append(res, v.info(sortKeyName))
+		}
 	}
 	if reversed {
 		sort.Sort(sort.Reverse(res))
