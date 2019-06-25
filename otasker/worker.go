@@ -35,7 +35,6 @@ type work struct {
 type worker struct {
 	oracleTasker
 	sync.RWMutex
-	inChan       chan work
 	stopSignal   chan void
 	stopCallback func(*worker)
 }
@@ -58,7 +57,7 @@ func (w *worker) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
 			{
 				return
 			}
-		case wrk := <-w.inChan:
+		case wrk := <-taskQueue:
 			{
 				outChan := wrk.outChan
 				if outChan == nil {
