@@ -52,10 +52,11 @@ func workerRun(t *testing.T, v test) {
 			}
 		}
 	}()
-
+	maxConcurrentSessions := 1
 	res := Run(
 		v.path,
 		ClassicTasker,
+		maxConcurrentSessions,
 		v.sessionID,
 		v.taskID,
 		v.userName,

@@ -1,4 +1,4 @@
-// worker
+//Package otasker ...
 package otasker
 
 import (
@@ -16,6 +16,8 @@ var numberOfSessions = metrics.NewInt("PersistentHandler_Number_Of_Sessions", "S
 type work struct {
 	sessionID         string
 	taskID            string
+	oraTaskerFactory  func() oracleTasker
+	outChan           chan<- OracleTaskResult
 	reqUserName       string
 	reqUserPass       string
 	reqConnStr        string
@@ -33,95 +35,63 @@ type work struct {
 type worker struct {
 	oracleTasker
 	sync.RWMutex
-	signalChan  chan string
-	inChan      chan work
-	outChanList map[string]chan OracleTaskResult
-	startedAt   time.Time
-	started     bool
+	inChan       chan work
+	stopSignal   chan void
+	stopCallback func(*worker)
 }
 
-func (w *worker) start() {
-	w.Lock()
-	w.startedAt = time.Now()
-	w.started = true
-	w.Unlock()
-}
-
-func (w *worker) finish() {
-	w.Lock()
-	w.startedAt = time.Time{}
-	w.started = false
-	w.Unlock()
-	w.signalChan <- ""
-}
-
-func (w *worker) outChan(taskID string) (chan OracleTaskResult, bool) {
-	w.RLock()
-	defer w.RUnlock()
-	c, ok := w.outChanList[taskID]
-	return c, ok
-}
-
-func (w *worker) worked() int64 {
-	w.RLock()
-	defer w.RUnlock()
-	if w.started {
-		return int64(time.Since(w.startedAt) / time.Second)
+func (w *worker) stop() {
+	if w.stopCallback != nil {
+		w.stopCallback(w)
 	}
-	return 0
 }
 
-func (w *worker) listen(path, ID string, idleTimeout time.Duration) {
-	w.signalChan <- ""
+func (w *worker) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
 	defer func() {
+		w.stop()
 		// Удаляем данный обработчик из списка доступных
-		wlock.Lock()
-		delete(wlist[path], ID)
-		wlock.Unlock()
 		w.CloseAndFree()
-		w.Lock()
-		for k, _ := range w.outChanList {
-			delete(w.outChanList, k)
-		}
-		w.Unlock()
-		numberOfSessions.Add(-1)
 	}()
-
-	//	timer := acquireTimer(idleTimeout)
-	//	defer releaseTimer(timer)
 	for {
 		select {
+		case <-w.stopSignal:
+			{
+				return
+			}
 		case wrk := <-w.inChan:
 			{
-				w.start()
-
-				res := func() OracleTaskResult {
-					return w.Run(wrk.sessionID,
-						wrk.taskID,
-						wrk.reqUserName,
-						wrk.reqUserPass,
-						wrk.reqConnStr,
-						wrk.reqParamStoreProc,
-						wrk.reqBeforeScript,
-						wrk.reqAfterScript,
-						wrk.reqDocumentTable,
-						wrk.reqCGIEnv,
-						wrk.reqProc,
-						wrk.reqParams,
-						wrk.reqFiles,
-						wrk.dumpFileName)
-				}()
-				outChan, ok := w.outChan(wrk.taskID)
-				if ok {
-					outChan <- res
+				outChan := wrk.outChan
+				if outChan == nil {
+					continue
 				}
-				w.finish()
+				w.oracleTasker = wrk.oraTaskerFactory()
+				res := w.Run(wrk.sessionID,
+					wrk.taskID,
+					wrk.reqUserName,
+					wrk.reqUserPass,
+					wrk.reqConnStr,
+					wrk.reqParamStoreProc,
+					wrk.reqBeforeScript,
+					wrk.reqAfterScript,
+					wrk.reqDocumentTable,
+					wrk.reqCGIEnv,
+					wrk.reqProc,
+					wrk.reqParams,
+					wrk.reqFiles,
+					wrk.dumpFileName)
+				outChan <- res
 				if res.StatusCode == StatusRequestWasInterrupted {
 					return
 				}
-
+				select {
+				case <-w.stopSignal:
+					{
+						return
+					}
+				default:
+				}
 			}
-		case /*<-timer.C*/ <-time.After(idleTimeout):
+		case <-time.After(idleTimeout):
 			{
 				return
 			}
@@ -129,14 +99,48 @@ func (w *worker) listen(path, ID string, idleTimeout time.Duration) {
 	}
 }
 
+type taskStatus struct {
+	outChan   chan OracleTaskResult
+	startTime time.Time
+}
+
+type managerTasks struct {
+	manager         *Manager
+	taskLock        sync.RWMutex
+	tasksInProgress map[string]*taskStatus
+}
+
+type hr struct {
+	path      string
+	sessionID string
+}
+
+func (h *hr) AllWorkersGone(m *Manager) {
+	wlock.Lock()
+	delete(managersTasks[h.path], h.sessionID)
+	wlock.Unlock()
+}
+
+func (h *hr) WorkerCreated(w *worker) {
+	numberOfSessions.Add(1)
+}
+
+func (h *hr) WorkerStopped(w *worker) {
+	numberOfSessions.Add(-1)
+}
+
 var (
-	wlock sync.RWMutex
-	wlist = make(map[string]map[string]*worker)
+	wlock         sync.RWMutex
+	wlist         = make(map[string]map[string]*worker)
+	managersTasks = make(map[string]map[string]*managerTasks)
 )
 
 const (
+	//ClassicTasker соответствует методу NewOwaClassicProcTasker
 	ClassicTasker = iota
+	//ApexTasker соответствует методу NewOwaApexProcTasker
 	ApexTasker
+	//EkbTasker соответствует методу NewOwaEkbProcTasker
 	EkbTasker
 )
 
@@ -148,9 +152,12 @@ var (
 	}
 )
 
+//Run выполняет задание, формируемое из входных параметров
+//с помощью доступных исполнителей и возвращает результат
 func Run(
 	path string,
 	typeTasker int,
+	maxWorkerCount int,
 	sessionID,
 	taskID,
 	userName,
@@ -164,115 +171,117 @@ func Run(
 	procName string,
 	urlParams url.Values,
 	reqFiles *mltpart.Form,
-	//fn func() oracleTasker,
 	waitTimeout, idleTimeout time.Duration,
 	dumpFileName string,
 ) OracleTaskResult {
-	w := func() *worker {
+	if maxWorkerCount < 0 {
+		maxWorkerCount = 1
+	}
+	mTasks := func() *managerTasks {
 		wlock.RLock()
-		w, ok := wlist[strings.ToUpper(path)][strings.ToUpper(sessionID)]
+		mTasks, ok := managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
 		wlock.RUnlock()
 		if !ok {
 			wlock.Lock()
 			defer wlock.Unlock()
-
-			w = &worker{
-				oracleTasker: taskerFactory[typeTasker](),
-				signalChan:   make(chan string, 1),
-				inChan:       make(chan work),
-				outChanList:  make(map[string]chan OracleTaskResult),
-				startedAt:    time.Time{},
-				started:      false,
+			hr := &hr{
+				path:      path,
+				sessionID: sessionID,
 			}
-			if _, ok := wlist[strings.ToUpper(path)]; !ok {
-				wlist[strings.ToUpper(path)] = make(map[string]*worker)
+			manager, _ := NewManager(hr, maxWorkerCount, idleTimeout)
+			mTasks = &managerTasks{
+				manager:         manager,
+				tasksInProgress: make(map[string]*taskStatus),
 			}
-			wlist[strings.ToUpper(path)][strings.ToUpper(sessionID)] = w
-			go w.listen(strings.ToUpper(path), strings.ToUpper(sessionID), idleTimeout)
-			numberOfSessions.Add(1)
+			if _, ok := managersTasks[strings.ToUpper(path)]; !ok {
+				managersTasks[strings.ToUpper(path)] = make(map[string]*managerTasks)
+			}
+			managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)] = mTasks
 		}
-		return w
+		return mTasks
 	}()
-
-	// Проверяем, если результаты по задаче
-	outChan, ok := w.outChan(taskID)
+	// Проверяем, есть ли результаты по задаче
+	mTasks.taskLock.RLock()
+	taskStat, ok := mTasks.tasksInProgress[taskID]
+	mTasks.taskLock.RUnlock()
 	if !ok {
-		//		timer := acquireTimer(waitTimeout)
-		//		defer releaseTimer(timer)
-		//Если еще не было отправки, то проверяем на то, что можно отправит
-		select {
-		case <-w.signalChan:
-			{
-				//Удалось прочитать сигнал о незанятости вокера. Шлем задачу в него
-				wrk := work{
-					sessionID:         sessionID,
-					taskID:            taskID,
-					reqUserName:       userName,
-					reqUserPass:       userPass,
-					reqConnStr:        connStr,
-					reqParamStoreProc: paramStoreProc,
-					reqBeforeScript:   beforeScript,
-					reqAfterScript:    afterScript,
-					reqDocumentTable:  documentTable,
-					reqCGIEnv:         cgiEnv,
-					reqProc:           procName,
-					reqParams:         urlParams,
-					reqFiles:          reqFiles,
-					dumpFileName:      dumpFileName,
+		taskStat = &taskStatus{
+			outChan:   make(chan OracleTaskResult),
+			startTime: time.Now(),
+		}
+		wrk := &work{
+			sessionID:         sessionID,
+			taskID:            taskID,
+			oraTaskerFactory:  taskerFactory[typeTasker],
+			outChan:           taskStat.outChan,
+			reqUserName:       userName,
+			reqUserPass:       userPass,
+			reqConnStr:        connStr,
+			reqParamStoreProc: paramStoreProc,
+			reqBeforeScript:   beforeScript,
+			reqAfterScript:    afterScript,
+			reqDocumentTable:  documentTable,
+			reqCGIEnv:         cgiEnv,
+			reqProc:           procName,
+			reqParams:         urlParams,
+			reqFiles:          reqFiles,
+			dumpFileName:      dumpFileName,
+		}
+		allWorkersBusyTimeout, _ := mTasks.manager.AssignTask(wrk, maxWorkerCount, waitTimeout)
+		if allWorkersBusyTimeout {
+			taskDuration := time.Duration(0)
+			mTasks.taskLock.RLock()
+			//Если в справочнике исполняемых ровно одно задание,..
+			if len(mTasks.tasksInProgress) == 1 {
+				//..то будем отсчитывать длительность от его начала
+				for _, taskStat := range mTasks.tasksInProgress {
+					taskDuration = time.Since(taskStat.startTime)
 				}
-				outChan = make(chan OracleTaskResult, 1)
-				w.Lock()
-				w.outChanList[taskID] = outChan
-				w.Unlock()
-				w.inChan <- wrk
-
 			}
-		case /*<-timer.C*/ <-time.After(waitTimeout):
-			{
-				/* Сигнализируем о том, что идет выполнение другог запроса и нужно предложить прервать */
-				return OracleTaskResult{StatusCode: StatusBreakPage, Duration: w.worked()}
-			}
+			mTasks.taskLock.RUnlock()
+			taskDurationSeconds := int64(taskDuration / time.Second)
+			// Сигнализируем о том, что идет выполнение другог запроса и нужно предложить прервать
+			return OracleTaskResult{StatusCode: StatusBreakPage, Duration: taskDurationSeconds}
 		}
 	}
 	//Читаем результаты
 	return func() OracleTaskResult {
-		//		timer := acquireTimer(waitTimeout)
-		//		defer releaseTimer(timer)
 		select {
-		case res := <-outChan:
-			w.Lock()
-			delete(w.outChanList, taskID)
-			w.Unlock()
+		case res := <-taskStat.outChan:
+			//Задание завершено
+			//Если задание есть в справочнике исполняемых,..
+			if ok {
+				//..то удалим его из справочника
+				mTasks.taskLock.Lock()
+				delete(mTasks.tasksInProgress, taskID)
+				mTasks.taskLock.Unlock()
+			}
 			return res
-		case /*<-timer.C*/ <-time.After(waitTimeout):
+		case <-time.After(waitTimeout):
 			{
-				/* Сигнализируем о том, что идет выполнение этого запроса и нужно показать червяка */
-				return OracleTaskResult{StatusCode: StatusWaitPage, Duration: w.worked()}
+				//Если задания нет в справочнике исполняемых,..
+				if !ok {
+					//..то добавим его в справочник
+					mTasks.taskLock.Lock()
+					mTasks.tasksInProgress[taskID] = taskStat
+					mTasks.taskLock.Unlock()
+				}
+				taskDuration := time.Since(taskStat.startTime)
+				taskDurationSeconds := int64(taskDuration / time.Second)
+				// Сигнализируем о том, что идет выполнение этого запроса и нужно показать червяка
+				return OracleTaskResult{StatusCode: StatusWaitPage, Duration: taskDurationSeconds}
 			}
 		}
 	}()
 }
 
+//Break останавливает всех исполнителей пользователя path|sessionID
 func Break(path, sessionID string) error {
 	wlock.RLock()
-	w, ok := wlist[strings.ToUpper(path)][strings.ToUpper(sessionID)]
+	mTasks, ok := managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
 	wlock.RUnlock()
 	if !ok {
 		return nil
 	}
-	//Если вокер есть, проверяемего статус
-	select {
-	case <-w.signalChan:
-		{
-			//Удалось прочитать сигнал о незанятости вокера. Некого прерыват. Выходим
-			return nil
-
-		}
-	default:
-		{
-			// Воркер занят. Прерываем его
-			return w.Break()
-		}
-	}
-
+	return mTasks.manager.BreakAll()
 }

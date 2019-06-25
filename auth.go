@@ -24,14 +24,14 @@ func Authenticator(authType int,
 			r.Header.Add("X-LoginUserName", defUserName)
 			r.Header.Add("X-LoginPassword", defUserPass)
 
-			isSpecial, connStr := getConnectionParams(defUserName, grps)
+			usrInfo, connStr := getConnectionParams(defUserName, grps)
 			if connStr == "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte("Unauthorized"))
 				return
 			}
 			r.Header.Add("X-LoginConnectionString", connStr)
-			r.Header.Add("X-LoginMany", strconv.FormatBool(isSpecial))
+			r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.IsSpecial))
 
 			next(w, r, p)
 			return
@@ -49,7 +49,7 @@ func Authenticator(authType int,
 				r.Header.Add("X-LoginUserName", userName)
 				r.Header.Add("X-LoginPassword", userPass)
 
-				isSpecial, connStr := getConnectionParams(userName, grps)
+				usrInfo, connStr := getConnectionParams(userName, grps)
 				if connStr == "" {
 					w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, authRealm))
 					w.WriteHeader(http.StatusUnauthorized)
@@ -57,7 +57,7 @@ func Authenticator(authType int,
 					return
 				}
 				r.Header.Add("X-LoginConnectionString", connStr)
-				r.Header.Add("X-LoginMany", strconv.FormatBool(isSpecial))
+				r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.IsSpecial))
 
 				w.Header().Set("Connection", "keep-alive")
 				w.Header().Set("Persistent-Auth", "true")
@@ -127,7 +127,7 @@ func Authenticator(authType int,
 				r.Header.Add("X-LoginUserName", authNTLMDBUserName)
 				r.Header.Add("X-LoginPassword", authNTLMDBUserPass)
 
-				isSpecial, connStr := getConnectionParams(userName, grps)
+				usrInfo, connStr := getConnectionParams(userName, grps)
 				if connStr == "" {
 					w.Header().Set("WWW-Authenticate", fmt.Sprintf("NTLM realm=\"%s%s\"", r.Host, authRealm))
 					w.WriteHeader(http.StatusUnauthorized)
@@ -135,7 +135,7 @@ func Authenticator(authType int,
 					return
 				}
 				r.Header.Add("X-LoginConnectionString", connStr)
-				r.Header.Add("X-LoginMany", strconv.FormatBool(isSpecial))
+				r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.IsSpecial))
 
 				next(w, r, p)
 			}

@@ -9,41 +9,44 @@ import (
 )
 
 type userInfo struct {
-	IsSpecial bool
-	GrpID     int32
+	IsSpecial                bool
+	GrpID                    int32
+	MaxConcurrentConnections int
 }
 
-func getUserInfo(name string) (bool, int32, bool) {
+func getUserInfo(name string) (userInfo, bool) {
 	ulock.RLock()
 	defer ulock.RUnlock()
 	u, ok := ulist[strings.ToUpper(name)]
 	if !ok {
-		return false, -1, false
+		return emptyUserInfo, false
 	}
-	return u.IsSpecial, u.GrpID, true
+	return *u, true
 }
 
-func getConnectionParams(user string, grps map[int32]string) (bool, string) {
+var emptyUserInfo = userInfo{IsSpecial: false, GrpID: -1, MaxConcurrentConnections: 1}
+
+func getConnectionParams(user string, grps map[int32]string) (userInfo, string) {
 	if user == "" {
-		return false, ""
+		return emptyUserInfo, ""
 	}
-	isSpecial, grpID, ok := getUserInfo(user)
+	uInfo, ok := getUserInfo(user)
 	if !ok {
-		return false, ""
+		return emptyUserInfo, ""
 	}
 	// Получаем глобальную строку соединения для ВСЕХ пользователей
 	sid := *conectionString
 	// если она пустая, ищем среди данных конфигурации
 	if sid == "" {
-		if sid, ok = grps[grpID]; !ok {
-			return false, ""
+		if sid, ok = grps[uInfo.GrpID]; !ok {
+			return emptyUserInfo, ""
 		}
 	} else {
-		if _, ok = grps[grpID]; !ok {
-			return false, ""
+		if _, ok = grps[uInfo.GrpID]; !ok {
+			return emptyUserInfo, ""
 		}
 	}
-	return isSpecial, sid
+	return uInfo, sid
 }
 
 func getUsers() ([]byte, error) {
@@ -76,9 +79,10 @@ func updateUsers(users []byte) {
 			}
 
 			type _tUser struct {
-				Name      string
-				IsSpecial bool
-				GRP_ID    int32
+				Name                     string
+				IsSpecial                bool
+				GRP_ID                   int32
+				MaxConcurrentConnections int
 			}
 			var t = []_tUser{}
 			if err := json.Unmarshal(users, &t); err != nil {
@@ -89,12 +93,14 @@ func updateUsers(users []byte) {
 				u, ok := usersFree.Get().(*userInfo)
 				if !ok {
 					u = &userInfo{
-						IsSpecial: t[k].IsSpecial,
-						GrpID:     t[k].GRP_ID,
+						IsSpecial:                t[k].IsSpecial,
+						GrpID:                    t[k].GRP_ID,
+						MaxConcurrentConnections: t[k].MaxConcurrentConnections,
 					}
 				} else {
 					u.IsSpecial = t[k].IsSpecial
 					u.GrpID = t[k].GRP_ID
+					u.MaxConcurrentConnections = t[k].MaxConcurrentConnections
 				}
 				ulist[strings.ToUpper(t[k].Name)] = u
 			}
