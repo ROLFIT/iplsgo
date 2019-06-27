@@ -17,7 +17,7 @@ type Dispatcher struct {
 	vacancyChanged    chan void
 	vacancies         chan void
 	maxProcCount      int
-	processors        map[*clientRecProc]void
+	processors        map[*clientReqProc]void
 	vacanciesLock     sync.RWMutex
 	processorLifespan time.Duration
 	hr                *hr
@@ -34,7 +34,7 @@ func NewDispatcher(hr *hr, maxProcCount int, processorLifespan time.Duration) (*
 	dispatcher := &Dispatcher{
 		taskQueue:         make(chan *work),
 		vacancyChanged:    make(chan void),
-		processors:        make(map[*clientRecProc]void),
+		processors:        make(map[*clientReqProc]void),
 		processorLifespan: processorLifespan,
 		hr:                hr,
 	}
@@ -108,7 +108,7 @@ func (d *Dispatcher) BreakAll() error {
 //createProcessor создаёт нового исполнителя и регистрирует
 //его в справочнике исполнителей workers
 func (d *Dispatcher) createProcessor() {
-	procStopped := func(p *clientRecProc) {
+	procStopped := func(p *clientReqProc) {
 		d.vacanciesLock.Lock()
 		delete(d.processors, p)
 		if d.maxProcCount > len(d.processors) {
@@ -124,7 +124,7 @@ func (d *Dispatcher) createProcessor() {
 	}
 	d.vacanciesLock.Lock()
 	defer d.vacanciesLock.Unlock()
-	processor := &clientRecProc{
+	processor := &clientReqProc{
 		stopSignal:   make(chan void, 1),
 		stopCallback: procStopped,
 	}

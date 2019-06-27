@@ -32,20 +32,20 @@ type work struct {
 	dumpFileName      string
 }
 
-type clientRecProc struct {
+type clientReqProc struct {
 	oracleTasker
 	sync.RWMutex
 	stopSignal   chan void
-	stopCallback func(*clientRecProc)
+	stopCallback func(*clientReqProc)
 }
 
-func (w *clientRecProc) stop() {
+func (w *clientReqProc) stop() {
 	if w.stopCallback != nil {
 		w.stopCallback(w)
 	}
 }
 
-func (w *clientRecProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
+func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
 	defer func() {
 		w.stop()
 		// Удаляем данный обработчик из списка доступных
@@ -120,11 +120,11 @@ func (h *hr) AllProcessorsStopped(d *Dispatcher) {
 	wlock.Unlock()
 }
 
-func (h *hr) ProcessorCreated(w *clientRecProc) {
+func (h *hr) ProcessorCreated(w *clientReqProc) {
 	numberOfSessions.Add(1)
 }
 
-func (h *hr) ProcessorStopped(w *clientRecProc) {
+func (h *hr) ProcessorStopped(w *clientReqProc) {
 	numberOfSessions.Add(-1)
 }
 
