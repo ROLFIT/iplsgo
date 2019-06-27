@@ -32,20 +32,20 @@ type work struct {
 	dumpFileName      string
 }
 
-type worker struct {
+type clientRecProc struct {
 	oracleTasker
 	sync.RWMutex
 	stopSignal   chan void
-	stopCallback func(*worker)
+	stopCallback func(*clientRecProc)
 }
 
-func (w *worker) stop() {
+func (w *clientRecProc) stop() {
 	if w.stopCallback != nil {
 		w.stopCallback(w)
 	}
 }
 
-func (w *worker) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
+func (w *clientRecProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
 	defer func() {
 		w.stop()
 		// Удаляем данный обработчик из списка доступных
@@ -103,8 +103,8 @@ type taskStatus struct {
 	startTime time.Time
 }
 
-type managerTasks struct {
-	manager         *Manager
+type dispatcherTasks struct {
+	dispatcher      *Dispatcher
 	taskLock        sync.RWMutex
 	tasksInProgress map[string]*taskStatus
 }
@@ -114,23 +114,23 @@ type hr struct {
 	sessionID string
 }
 
-func (h *hr) AllWorkersGone(m *Manager) {
+func (h *hr) AllProcessorsStopped(d *Dispatcher) {
 	wlock.Lock()
-	delete(managersTasks[h.path], h.sessionID)
+	delete(dispatchersTasks[h.path], h.sessionID)
 	wlock.Unlock()
 }
 
-func (h *hr) WorkerCreated(w *worker) {
+func (h *hr) ProcessorCreated(w *clientRecProc) {
 	numberOfSessions.Add(1)
 }
 
-func (h *hr) WorkerStopped(w *worker) {
+func (h *hr) ProcessorStopped(w *clientRecProc) {
 	numberOfSessions.Add(-1)
 }
 
 var (
-	wlock         sync.RWMutex
-	managersTasks = make(map[string]map[string]*managerTasks)
+	wlock            sync.RWMutex
+	dispatchersTasks = make(map[string]map[string]*dispatcherTasks)
 )
 
 const (
@@ -155,7 +155,7 @@ var (
 func Run(
 	path string,
 	typeTasker int,
-	maxWorkerCount int,
+	maxProcCount int,
 	sessionID,
 	taskID,
 	userName,
@@ -172,12 +172,12 @@ func Run(
 	waitTimeout, idleTimeout time.Duration,
 	dumpFileName string,
 ) OracleTaskResult {
-	if maxWorkerCount < 0 {
-		maxWorkerCount = 1
+	if maxProcCount < 0 {
+		maxProcCount = 1
 	}
-	mTasks := func() *managerTasks {
+	dTasks := func() *dispatcherTasks {
 		wlock.RLock()
-		mTasks, ok := managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
+		dTasks, ok := dispatchersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
 		wlock.RUnlock()
 		if !ok {
 			wlock.Lock()
@@ -186,22 +186,22 @@ func Run(
 				path:      path,
 				sessionID: sessionID,
 			}
-			manager, _ := NewManager(hr, maxWorkerCount, idleTimeout)
-			mTasks = &managerTasks{
-				manager:         manager,
+			dispatcher, _ := NewDispatcher(hr, maxProcCount, idleTimeout)
+			dTasks = &dispatcherTasks{
+				dispatcher:      dispatcher,
 				tasksInProgress: make(map[string]*taskStatus),
 			}
-			if _, ok := managersTasks[strings.ToUpper(path)]; !ok {
-				managersTasks[strings.ToUpper(path)] = make(map[string]*managerTasks)
+			if _, ok := dispatchersTasks[strings.ToUpper(path)]; !ok {
+				dispatchersTasks[strings.ToUpper(path)] = make(map[string]*dispatcherTasks)
 			}
-			managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)] = mTasks
+			dispatchersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)] = dTasks
 		}
-		return mTasks
+		return dTasks
 	}()
 	// Проверяем, есть ли результаты по задаче
-	mTasks.taskLock.RLock()
-	taskStat, ok := mTasks.tasksInProgress[taskID]
-	mTasks.taskLock.RUnlock()
+	dTasks.taskLock.RLock()
+	taskStat, ok := dTasks.tasksInProgress[taskID]
+	dTasks.taskLock.RUnlock()
 	if !ok {
 		taskStat = &taskStatus{
 			outChan:   make(chan OracleTaskResult),
@@ -225,18 +225,18 @@ func Run(
 			reqFiles:          reqFiles,
 			dumpFileName:      dumpFileName,
 		}
-		allWorkersBusyTimeout, _ := mTasks.manager.AssignTask(wrk, maxWorkerCount, waitTimeout)
+		allWorkersBusyTimeout, _ := dTasks.dispatcher.AssignTask(wrk, maxProcCount, waitTimeout)
 		if allWorkersBusyTimeout {
 			taskDuration := time.Duration(0)
-			mTasks.taskLock.RLock()
+			dTasks.taskLock.RLock()
 			//Если в справочнике исполняемых ровно одно задание,..
-			if len(mTasks.tasksInProgress) == 1 {
+			if len(dTasks.tasksInProgress) == 1 {
 				//..то будем отсчитывать длительность от его начала
-				for _, taskStat := range mTasks.tasksInProgress {
+				for _, taskStat := range dTasks.tasksInProgress {
 					taskDuration = time.Since(taskStat.startTime)
 				}
 			}
-			mTasks.taskLock.RUnlock()
+			dTasks.taskLock.RUnlock()
 			taskDurationSeconds := int64(taskDuration / time.Second)
 			// Сигнализируем о том, что идет выполнение другог запроса и нужно предложить прервать
 			return OracleTaskResult{StatusCode: StatusBreakPage, Duration: taskDurationSeconds}
@@ -250,9 +250,9 @@ func Run(
 			//Если задание есть в справочнике исполняемых,..
 			if ok {
 				//..то удалим его из справочника
-				mTasks.taskLock.Lock()
-				delete(mTasks.tasksInProgress, taskID)
-				mTasks.taskLock.Unlock()
+				dTasks.taskLock.Lock()
+				delete(dTasks.tasksInProgress, taskID)
+				dTasks.taskLock.Unlock()
 			}
 			return res
 		case <-time.After(waitTimeout):
@@ -260,9 +260,9 @@ func Run(
 				//Если задания нет в справочнике исполняемых,..
 				if !ok {
 					//..то добавим его в справочник
-					mTasks.taskLock.Lock()
-					mTasks.tasksInProgress[taskID] = taskStat
-					mTasks.taskLock.Unlock()
+					dTasks.taskLock.Lock()
+					dTasks.tasksInProgress[taskID] = taskStat
+					dTasks.taskLock.Unlock()
 				}
 				taskDuration := time.Since(taskStat.startTime)
 				taskDurationSeconds := int64(taskDuration / time.Second)
@@ -276,10 +276,10 @@ func Run(
 //Break останавливает всех исполнителей пользователя path|sessionID
 func Break(path, sessionID string) error {
 	wlock.RLock()
-	mTasks, ok := managersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
+	dTasks, ok := dispatchersTasks[strings.ToUpper(path)][strings.ToUpper(sessionID)]
 	wlock.RUnlock()
 	if !ok {
 		return nil
 	}
-	return mTasks.manager.BreakAll()
+	return dTasks.dispatcher.BreakAll()
 }

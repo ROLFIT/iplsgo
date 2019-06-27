@@ -299,11 +299,11 @@ end;`,
 	}
 
 	wlock.Lock()
-	if len(wlist[vpath]) > 0 {
-		for k, _ := range wlist[vpath] {
+	if len(dispatchersTasks[vpath]) > 0 {
+		for k, _ := range dispatchersTasks[vpath] {
 			t.Log(k)
 		}
-		t.Fatalf("len(wlist[vpath]) = %d", len(wlist[vpath]))
+		t.Fatalf("len(managersTasks[vpath]) = %d", len(dispatchersTasks[vpath]))
 	}
 	wlock.Unlock()
 }
