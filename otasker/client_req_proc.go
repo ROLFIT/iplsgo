@@ -13,126 +13,6 @@ import (
 
 var numberOfSessions = metrics.NewInt("PersistentHandler_Number_Of_Sessions", "Server - Number of persistent sessions", "Pieces", "p")
 
-type work struct {
-	sessionID         string
-	taskID            string
-	oraTaskerFactory  func() oracleTasker
-	outChan           chan<- OracleTaskResult
-	reqUserName       string
-	reqUserPass       string
-	reqConnStr        string
-	reqParamStoreProc string
-	reqBeforeScript   string
-	reqAfterScript    string
-	reqDocumentTable  string
-	reqCGIEnv         map[string]string
-	reqProc           string
-	reqParams         url.Values
-	reqFiles          *mltpart.Form
-	dumpFileName      string
-}
-
-type clientReqProc struct {
-	oracleTasker
-	sync.RWMutex
-	stopSignal   chan void
-	stopCallback func(*clientReqProc)
-}
-
-func (w *clientReqProc) stop() {
-	if w.stopCallback != nil {
-		w.stopCallback(w)
-	}
-}
-
-func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
-	defer func() {
-		w.stop()
-		// Удаляем данный обработчик из списка доступных
-		w.CloseAndFree()
-	}()
-	for {
-		select {
-		case <-w.stopSignal:
-			{
-				return
-			}
-		case wrk := <-taskQueue:
-			{
-				outChan := wrk.outChan
-				if outChan == nil {
-					continue
-				}
-				w.oracleTasker = wrk.oraTaskerFactory()
-				res := w.Run(wrk.sessionID,
-					wrk.taskID,
-					wrk.reqUserName,
-					wrk.reqUserPass,
-					wrk.reqConnStr,
-					wrk.reqParamStoreProc,
-					wrk.reqBeforeScript,
-					wrk.reqAfterScript,
-					wrk.reqDocumentTable,
-					wrk.reqCGIEnv,
-					wrk.reqProc,
-					wrk.reqParams,
-					wrk.reqFiles,
-					wrk.dumpFileName)
-				outChan <- res
-				if res.StatusCode == StatusRequestWasInterrupted {
-					return
-				}
-				select {
-				case <-w.stopSignal:
-					{
-						return
-					}
-				default:
-				}
-			}
-		case <-time.After(idleTimeout):
-			{
-				return
-			}
-		}
-	}
-}
-
-type taskStatus struct {
-	outChan   chan OracleTaskResult
-	startTime time.Time
-}
-
-type dispatcherTasks struct {
-	dispatcher      *Dispatcher
-	taskLock        sync.RWMutex
-	tasksInProgress map[string]*taskStatus
-}
-
-type hr struct {
-	path      string
-	sessionID string
-}
-
-func (h *hr) AllProcessorsStopped(d *Dispatcher) {
-	wlock.Lock()
-	delete(dispatchersTasks[h.path], h.sessionID)
-	wlock.Unlock()
-}
-
-func (h *hr) ProcessorCreated(w *clientReqProc) {
-	numberOfSessions.Add(1)
-}
-
-func (h *hr) ProcessorStopped(w *clientReqProc) {
-	numberOfSessions.Add(-1)
-}
-
-var (
-	wlock            sync.RWMutex
-	dispatchersTasks = make(map[string]map[string]*dispatcherTasks)
-)
-
 const (
 	//ClassicTasker соответствует методу NewOwaClassicProcTasker
 	ClassicTasker = iota
@@ -143,7 +23,9 @@ const (
 )
 
 var (
-	taskerFactory = map[int]func() oracleTasker{
+	wlock            sync.RWMutex
+	dispatchersTasks = make(map[string]map[string]*dispatcherTasks)
+	taskerFactory    = map[int]func() oracleTasker{
 		ClassicTasker: NewOwaClassicProcTasker(),
 		ApexTasker:    NewOwaApexProcTasker(),
 		EkbTasker:     NewOwaEkbProcTasker(),
@@ -282,4 +164,119 @@ func Break(path, sessionID string) error {
 		return nil
 	}
 	return dTasks.dispatcher.BreakAll()
+}
+
+type work struct {
+	sessionID         string
+	taskID            string
+	oraTaskerFactory  func() oracleTasker
+	outChan           chan<- OracleTaskResult
+	reqUserName       string
+	reqUserPass       string
+	reqConnStr        string
+	reqParamStoreProc string
+	reqBeforeScript   string
+	reqAfterScript    string
+	reqDocumentTable  string
+	reqCGIEnv         map[string]string
+	reqProc           string
+	reqParams         url.Values
+	reqFiles          *mltpart.Form
+	dumpFileName      string
+}
+
+type clientReqProc struct {
+	oracleTasker
+	sync.RWMutex
+	stopSignal   chan void
+	stopCallback func(*clientReqProc)
+}
+
+func (w *clientReqProc) stop() {
+	if w.stopCallback != nil {
+		w.stopCallback(w)
+	}
+}
+
+func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
+	defer func() {
+		w.stop()
+		// Удаляем данный обработчик из списка доступных
+		w.CloseAndFree()
+	}()
+	for {
+		select {
+		case <-w.stopSignal:
+			{
+				return
+			}
+		case wrk := <-taskQueue:
+			{
+				outChan := wrk.outChan
+				if outChan == nil {
+					continue
+				}
+				w.oracleTasker = wrk.oraTaskerFactory()
+				res := w.Run(wrk.sessionID,
+					wrk.taskID,
+					wrk.reqUserName,
+					wrk.reqUserPass,
+					wrk.reqConnStr,
+					wrk.reqParamStoreProc,
+					wrk.reqBeforeScript,
+					wrk.reqAfterScript,
+					wrk.reqDocumentTable,
+					wrk.reqCGIEnv,
+					wrk.reqProc,
+					wrk.reqParams,
+					wrk.reqFiles,
+					wrk.dumpFileName)
+				outChan <- res
+				if res.StatusCode == StatusRequestWasInterrupted {
+					return
+				}
+				select {
+				case <-w.stopSignal:
+					{
+						return
+					}
+				default:
+				}
+			}
+		case <-time.After(idleTimeout):
+			{
+				return
+			}
+		}
+	}
+}
+
+type dispatcherTasks struct {
+	dispatcher      *Dispatcher
+	taskLock        sync.RWMutex
+	tasksInProgress map[string]*taskStatus
+}
+
+type taskStatus struct {
+	outChan   chan OracleTaskResult
+	startTime time.Time
+}
+
+type hr struct {
+	path      string
+	sessionID string
+}
+
+func (h *hr) AllProcessorsStopped(d *Dispatcher) {
+	wlock.Lock()
+	delete(dispatchersTasks[h.path], h.sessionID)
+	wlock.Unlock()
+}
+
+func (h *hr) ProcessorCreated(w *clientReqProc) {
+	numberOfSessions.Add(1)
+}
+
+func (h *hr) ProcessorStopped(w *clientReqProc) {
+	numberOfSessions.Add(-1)
 }
