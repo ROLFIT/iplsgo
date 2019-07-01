@@ -90,16 +90,14 @@ func (d *Dispatcher) BreakAll() error {
 		select {
 		case proc.stopSignal <- signal:
 			{
-				return nil
 			}
 		default:
 			{
-				// Обработчик занят. Прерываем его
-				err := proc.Break()
-				if err != nil {
-					errors = fmt.Errorf("%s\n Error occurred %s", errors, err)
-				}
 			}
+		}
+		err := proc.Break()
+		if err != nil {
+			errors = fmt.Errorf("%s\n Error occurred %s", errors, err)
 		}
 	}
 	return errors
