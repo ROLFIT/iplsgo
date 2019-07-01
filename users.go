@@ -9,9 +9,9 @@ import (
 )
 
 type userInfo struct {
-	IsSpecial                bool
-	GrpID                    int32
-	MaxConcurrentConnections int
+	AllowConcurrentConnections bool
+	GrpID                      int32
+	MaxConcurrentConnections   int
 }
 
 func getUserInfo(name string) (userInfo, bool) {
@@ -24,7 +24,7 @@ func getUserInfo(name string) (userInfo, bool) {
 	return *u, true
 }
 
-var emptyUserInfo = userInfo{IsSpecial: false, GrpID: -1, MaxConcurrentConnections: 1}
+var emptyUserInfo = userInfo{AllowConcurrentConnections: false, GrpID: -1, MaxConcurrentConnections: 1}
 
 func getConnectionParams(user string, grps map[int32]string) (userInfo, string) {
 	if user == "" {
@@ -79,10 +79,10 @@ func updateUsers(users []byte) {
 			}
 
 			type _tUser struct {
-				Name                     string
-				IsSpecial                bool
-				GRP_ID                   int32
-				MaxConcurrentConnections int
+				Name                       string
+				AllowConcurrentConnections bool
+				GRP_ID                     int32
+				MaxConcurrentConnections   int
 			}
 			var t = []_tUser{}
 			if err := json.Unmarshal(users, &t); err != nil {
@@ -93,12 +93,12 @@ func updateUsers(users []byte) {
 				u, ok := usersFree.Get().(*userInfo)
 				if !ok {
 					u = &userInfo{
-						IsSpecial:                t[k].IsSpecial,
-						GrpID:                    t[k].GRP_ID,
-						MaxConcurrentConnections: t[k].MaxConcurrentConnections,
+						AllowConcurrentConnections: t[k].AllowConcurrentConnections,
+						GrpID:                      t[k].GRP_ID,
+						MaxConcurrentConnections:   t[k].MaxConcurrentConnections,
 					}
 				} else {
-					u.IsSpecial = t[k].IsSpecial
+					u.AllowConcurrentConnections = t[k].AllowConcurrentConnections
 					u.GrpID = t[k].GRP_ID
 					u.MaxConcurrentConnections = t[k].MaxConcurrentConnections
 				}

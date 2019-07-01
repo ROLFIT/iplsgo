@@ -483,7 +483,7 @@ func newOwa(
 			return
 		}
 
-		sessionID := makeHandlerID(usrInfo.IsSpecial, userName, userPass, r.Header.Get("DebugIP"), r)
+		sessionID := makeHandlerID(usrInfo.AllowConcurrentConnections, userName, userPass, r.Header.Get("DebugIP"), r)
 		taskID := makeTaskID(r)
 
 		cgiEnv := makeEnvParams(r, documentTable, remoteUser, requestUserRealm+"/")
@@ -508,7 +508,7 @@ func newOwa(
 			sessionIdleTimeout = math.MaxInt64
 		}
 		maxConcurrentConnections := 1
-		if usrInfo.IsSpecial {
+		if usrInfo.AllowConcurrentConnections {
 			maxConcurrentConnections = usrInfo.MaxConcurrentConnections
 		}
 		res := otasker.Run(
