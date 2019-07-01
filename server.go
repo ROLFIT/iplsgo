@@ -298,9 +298,6 @@ func parseConfig(buf []byte) error {
 						templates,
 						grps)
 
-					if *routerHeadFlag == true {
-						newRouter.HEAD(upath+"/*proc", f)
-					}
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
@@ -312,9 +309,6 @@ func parseConfig(buf []byte) error {
 						c.Handlers[k].SoapUserPass,
 						c.Handlers[k].SoapConnStr)
 
-					if *routerHeadFlag == true {
-						newRouter.HEAD(upath+"/*proc", f)
-					}
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
@@ -374,7 +368,13 @@ func parseConfig(buf []byte) error {
 		updateUsers(c.HTTPUsers)
 		// -- //
 		router = newRouter
-		// -- //
+
+		// TODO: copy так не работает -- надо сначала выделить память
+		// в prevConf
+		//
+		// А лучше полностью изменить механизм кеширования: отслеживать измене-
+		// ния данных в базе с помощью триггера, здесь достаточно сравнивать
+		// версии или даты последнего изменения данных
 		copy(prevConf, buf)
 	}()
 	return nil
@@ -474,8 +474,7 @@ func newOwa(
 		}
 		dumpFileName := expandFileName(fmt.Sprintf("${log_dir}/err_%s_${datetime}.log", userName))
 
-		var isSpecial bool
-		isSpecial, connStr := getConnectionParams(userName, grps)
+		usrInfo, connStr := getConnectionParams(userName, grps)
 
 		if connStr == "" {
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
@@ -484,7 +483,7 @@ func newOwa(
 			return
 		}
 
-		sessionID := makeHandlerID(isSpecial, userName, userPass, r.Header.Get("DebugIP"), r)
+		sessionID := makeHandlerID(usrInfo.AllowConcurrentConnections, userName, userPass, r.Header.Get("DebugIP"), r)
 		taskID := makeTaskID(r)
 
 		cgiEnv := makeEnvParams(r, documentTable, remoteUser, requestUserRealm+"/")
@@ -508,10 +507,14 @@ func newOwa(
 		if sessionIdleTimeout < 0 {
 			sessionIdleTimeout = math.MaxInt64
 		}
-
+		maxConcurrentConnections := 1
+		if usrInfo.AllowConcurrentConnections {
+			maxConcurrentConnections = usrInfo.MaxConcurrentConnections
+		}
 		res := otasker.Run(
 			vpath,
 			typeTasker,
+			maxConcurrentConnections,
 			sessionID,
 			taskID,
 			userName,

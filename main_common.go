@@ -14,7 +14,6 @@ var (
 	confNameFlag        *string
 	confReadTimeoutFlag *int
 	conectionString     *string
-	routerHeadFlag      *bool
 )
 
 func setupFlags() {
@@ -25,7 +24,6 @@ func setupFlags() {
 	confNameFlag = flag.String("conf", "", "   Configuration name")
 	confReadTimeoutFlag = flag.Int("conf_tm", 10, "Configuration read timeout in seconds")
 	conectionString = flag.String("cs", "", "    Connection string for ALL users")
-	routerHeadFlag = flag.Bool("routerHead", false, "Add method router HEAD")
 }
 
 const usageTemplate = `iplsgo is OWA/APEX listener

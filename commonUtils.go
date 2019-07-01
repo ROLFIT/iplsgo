@@ -4,6 +4,7 @@ package main
 import (
 	"net"
 	"net/http"
+
 	//"net/url"
 	"strings"
 
@@ -11,9 +12,9 @@ import (
 	"github.com/vsdutka/iplsgo/otasker"
 )
 
-func makeHandlerID(isSpecial bool, userName, userPass, debugIP string, req *http.Request) string {
+func makeHandlerID(allowConcurrentConnections bool, userName, userPass, debugIP string, req *http.Request) string {
 	addr := ""
-	if isSpecial {
+	if allowConcurrentConnections {
 		addr = req.Header.Get("X-Real-IP")
 		if addr == "" {
 			addr = req.Header.Get("X-Forwarded-For")
@@ -26,7 +27,7 @@ func makeHandlerID(isSpecial bool, userName, userPass, debugIP string, req *http
 	if debugIP == "uuid" {
 		host = uuid.New()
 	}
-	if isSpecial {
+	if allowConcurrentConnections {
 		if debugIP == "" {
 			debugIP = req.Header.Get("X-Request-Id")
 		}

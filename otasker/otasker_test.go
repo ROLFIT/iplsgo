@@ -3,7 +3,6 @@ package otasker
 
 import (
 	"fmt"
-	"net/textproto"
 	"net/url"
 	"strings"
 	"testing"
@@ -323,11 +322,11 @@ func TestTaskerRun(t *testing.T) {
 				paramValues: []string{},
 				reqFiles: &mltpart.Form{
 					Value: map[string][]string{},
-					File: map[string][]*mltpart.FileHeader{"ap": []*mltpart.FileHeader{
-						mltpart.NewFileHeader("test_file.txt1", textproto.MIMEHeader{
-							"Content-Disposition": []string{"filename=\"test_file_1.txt\""},
-							"Content-Type":        []string{"text/html"},
-						}, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
+					File:  map[string][]*mltpart.FileHeader{"ap": []*mltpart.FileHeader{
+						// mltpart.NewFileHeader("test_file.txt1", textproto.MIMEHeader{
+						// 	"Content-Disposition": []string{"filename=\"test_file_1.txt\""},
+						// 	"Content-Type":        []string{"text/html"},
+						// }, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
 						//						&mltpart.FileHeader{
 						//							Filename: "test_file.txt1",
 						//							Header: textproto.MIMEHeader{
@@ -350,14 +349,14 @@ func TestTaskerRun(t *testing.T) {
 					Value: map[string][]string{},
 					File: map[string][]*mltpart.FileHeader{
 						"ap": []*mltpart.FileHeader{
-							mltpart.NewFileHeader("test_file.txt1", textproto.MIMEHeader{
-								"Content-Disposition": []string{"filename=\"test_file_1.txt\""},
-								"Content-Type":        []string{"text/html"},
-							}, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
-							mltpart.NewFileHeader("test_file.txt2", textproto.MIMEHeader{
-								"Content-Disposition": []string{"filename=\"test_file_2.txt\""},
-								"Content-Type":        []string{"text/html"},
-							}, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
+							// mltpart.NewFileHeader("test_file.txt1", textproto.MIMEHeader{
+							// 	"Content-Disposition": []string{"filename=\"test_file_1.txt\""},
+							// 	"Content-Type":        []string{"text/html"},
+							// }, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
+							// mltpart.NewFileHeader("test_file.txt2", textproto.MIMEHeader{
+							// 	"Content-Disposition": []string{"filename=\"test_file_2.txt\""},
+							// 	"Content-Type":        []string{"text/html"},
+							// }, []byte{1, 2, 3, 4, 5, 6, 7, 8}),
 							//							&mltpart.FileHeader{
 							//								Filename: "test_file.txt1",
 							//								Header: textproto.MIMEHeader{
