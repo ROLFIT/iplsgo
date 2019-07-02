@@ -52,7 +52,6 @@ log/iPLSGo_10111/ops.json
 *.pprof
 *.rar
 *.html
-*.cmd
 _Vendor/*.*
 assets/*.*
 assets/
@@ -69,3 +68,6 @@ lfw/
 pool/
 .vs/
 iplsgo.code-workspace
+
+32/
+64/
