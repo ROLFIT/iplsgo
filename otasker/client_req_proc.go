@@ -216,7 +216,9 @@ func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration
 				if outChan == nil {
 					continue
 				}
-				w.oracleTasker = wrk.oraTaskerFactory()
+				if w.oracleTasker.conn == nil {
+					w.oracleTasker = wrk.oraTaskerFactory()
+				}
 				res := w.Run(wrk.sessionID,
 					wrk.taskID,
 					wrk.reqUserName,
