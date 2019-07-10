@@ -79,10 +79,10 @@ func updateUsers(users []byte) {
 			}
 
 			type _tUser struct {
-				Name                       string
-				AllowConcurrentConnections bool
-				GRP_ID                     int32
-				MaxConcurrentConnections   int
+				Name                     string
+				IsSpecial                bool
+				GRP_ID                   int32
+				MaxConcurrentConnections int
 			}
 			var t = []_tUser{}
 			if err := json.Unmarshal(users, &t); err != nil {
@@ -93,12 +93,12 @@ func updateUsers(users []byte) {
 				u, ok := usersFree.Get().(*userInfo)
 				if !ok {
 					u = &userInfo{
-						AllowConcurrentConnections: t[k].AllowConcurrentConnections,
+						AllowConcurrentConnections: t[k].IsSpecial,
 						GrpID:                      t[k].GRP_ID,
 						MaxConcurrentConnections:   t[k].MaxConcurrentConnections,
 					}
 				} else {
-					u.AllowConcurrentConnections = t[k].AllowConcurrentConnections
+					u.AllowConcurrentConnections = t[k].IsSpecial
 					u.GrpID = t[k].GRP_ID
 					u.MaxConcurrentConnections = t[k].MaxConcurrentConnections
 				}
