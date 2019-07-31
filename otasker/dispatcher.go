@@ -52,13 +52,24 @@ func (d *Dispatcher) AssignTask(request *work, maxProcCount int, timeout time.Du
 
 	vacancies := d.vacancies
 	for {
+		//Первым делом проверим канал свободных исполнителей
 		select {
 		case d.taskQueue <- request:
 			{
 				//Задача назначена свободному исполнителю
 				//Обновим вакансии и завершим работу менеджера
 				//по обработке запроса
-				vacancies = d.vacancies
+				return false, nil
+			}
+		default:
+		}
+		//Свободных не нашлось. Будем ждать
+		select {
+		case d.taskQueue <- request:
+			{
+				//Задача назначена свободному исполнителю
+				//Обновим вакансии и завершим работу менеджера
+				//по обработке запроса
 				return false, nil
 			}
 		case <-d.vacancyChanged:
