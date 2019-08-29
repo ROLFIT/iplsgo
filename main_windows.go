@@ -17,9 +17,9 @@ import (
 
 /*
 	ВАЖНО собирать с set
-	GODEBUG=cgocheck=0
-	CGO_CFLAGS=-ID:\oracle\instantclient_12_1\sdk\include
-	CGO_LDFLAGS=-LD:\oracle\instantclient_12_1\sdk\lib -loci
+	set GODEBUG=cgocheck=0
+	set CGO_CFLAGS=-ID:\oracle\instantclient_12_1\sdk\include
+	set CGO_LDFLAGS=-LD:\oracle\instantclient_12_1\sdk\lib -loci
 */
 var (
 	logger     service.Logger
