@@ -52,8 +52,8 @@ func main() {
 	flag.Parse()
 
 	if *verFlag == true {
-		fmt.Println("Version: ", VERSION)
-		fmt.Println("Build:   ", BUILD_DATE)
+		fmt.Println("Version: ", Version)
+		fmt.Println("Build:   ", BuildDate)
 		os.Exit(0)
 	}
 
@@ -97,5 +97,4 @@ func main() {
 
 	<-done
 	logInfof("Server stopped\n")
-
 }
