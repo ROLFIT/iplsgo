@@ -13,7 +13,7 @@ import (
 	"html/template"
 	"testing"
 
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/mltpart"
 )
 
 func TestMakeWaitForm(t *testing.T) {

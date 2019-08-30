@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/mltpart"
 )
 
 type test struct {

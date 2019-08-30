@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vsdutka/metrics"
+	"github.com/rolfit/metrics"
 )
 
 var countOfRequests = metrics.NewInt("Http_Number_Of_Requests", "HTTP - Number of http requests", "Items", "i")

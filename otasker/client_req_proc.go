@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vsdutka/metrics"
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/metrics"
+	"github.com/rolfit/mltpart"
 )
 
 var numberOfSessions = metrics.NewInt("PersistentHandler_Number_Of_Sessions", "Server - Number of persistent sessions", "Pieces", "p")

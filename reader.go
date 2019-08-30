@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/vsdutka/iplsgo/otasker"
-	"github.com/vsdutka/metrics"
+	"github.com/rolfit/iplsgo/otasker"
+	"github.com/rolfit/metrics"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/goracle.v1/oracle"
 )

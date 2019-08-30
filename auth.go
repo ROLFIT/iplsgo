@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/vsdutka/iplsgo/auth/ntlm"
+	"github.com/rolfit/iplsgo/auth/ntlm"
 )
 
 // Authenticator is a function

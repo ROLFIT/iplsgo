@@ -1,6 +1,6 @@
 package main
 
-//go:generate C:\!Dev\GOPATH\src\github.com\vsdutka\gover\gover.exe
+//go:generate C:\!Dev\GOPATH\src\github.com\rolfit\gover\gover.exe
 import (
 	"flag"
 	"fmt"

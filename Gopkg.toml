@@ -47,15 +47,15 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/vsdutka/metrics"
+  name = "github.com/rolfit/metrics"
 
 [[constraint]]
   branch = "master"
-  name = "github.com/vsdutka/mltpart"
+  name = "github.com/rolfit/mltpart"
 
 [[constraint]]
   branch = "master"
-  name = "github.com/vsdutka/nspercent-encoding"
+  name = "github.com/rolfit/nspercent-encoding"
 
 [[constraint]]
   branch = "v1"

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/mltpart"
 )
 
 func prepareData(t *testing.T, vpath string) {

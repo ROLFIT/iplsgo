@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vsdutka/metrics"
+	"github.com/rolfit/metrics"
 )
 
 var (
