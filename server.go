@@ -282,21 +282,41 @@ func parseConfig(buf []byte) error {
 						grps[v1.ID] = v1.SID
 					}
 
-					f := newOwa(
-						upath,
-						typeTasker,
-						time.Duration(c.Handlers[k].SessionIdleTimeout)*time.Millisecond,
-						time.Duration(c.Handlers[k].SessionWaitTimeout)*time.Millisecond,
-						c.Handlers[k].RequestUserInfo,
+					f := Authenticator(
+						c.Handlers[k].AuthType,
 						c.Handlers[k].RequestUserRealm,
 						c.Handlers[k].DefUserName,
 						c.Handlers[k].DefUserPass,
-						c.Handlers[k].BeforeScript,
-						c.Handlers[k].AfterScript,
-						c.Handlers[k].ParamStoreProc,
-						c.Handlers[k].DocumentTable,
-						templates,
-						grps)
+						c.Handlers[k].AuthNTLMDBUserName,
+						c.Handlers[k].AuthNTLMDBUserPass,
+						grps,
+						newOwa(
+							upath,
+							typeTasker,
+							time.Duration(c.Handlers[k].SessionIdleTimeout)*time.Millisecond,
+							time.Duration(c.Handlers[k].SessionWaitTimeout)*time.Millisecond,
+							c.Handlers[k].RequestUserRealm,
+							c.Handlers[k].BeforeScript,
+							c.Handlers[k].AfterScript,
+							c.Handlers[k].ParamStoreProc,
+							c.Handlers[k].DocumentTable,
+							templates))
+
+					// f := newOwa(
+					// 	upath,
+					// 	typeTasker,
+					// 	time.Duration(c.Handlers[k].SessionIdleTimeout)*time.Millisecond,
+					// 	time.Duration(c.Handlers[k].SessionWaitTimeout)*time.Millisecond,
+					// 	c.Handlers[k].RequestUserInfo,
+					// 	c.Handlers[k].RequestUserRealm,
+					// 	c.Handlers[k].DefUserName,
+					// 	c.Handlers[k].DefUserPass,
+					// 	c.Handlers[k].BeforeScript,
+					// 	c.Handlers[k].AfterScript,
+					// 	c.Handlers[k].ParamStoreProc,
+					// 	c.Handlers[k].DocumentTable,
+					// 	templates,
+					// 	grps)
 
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
@@ -425,17 +445,15 @@ func newOwa(
 	typeTasker int,
 	sessionIdleTimeout,
 	sessionWaitTimeout time.Duration,
-	requestUserInfo bool,
+	//requestUserInfo bool,
 	requestUserRealm,
-	defUserName,
-	defUserPass,
+	//defUserName,
+	//defUserPass,
 	beforeScript,
 	afterScript,
 	paramStoreProc,
 	documentTable string,
-	templates map[string]string,
-	grps map[int32]string,
-) func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	templates map[string]string) func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 		r.URL.RawQuery = NSPercentEncoding.FixNonStandardPercentEncoding(r.URL.RawQuery)
@@ -452,38 +470,51 @@ func newOwa(
 			return
 		}
 
-		userName, userPass, ok := r.BasicAuth()
+		//userName, userPass, ok := r.BasicAuth()
 
-		remoteUser := userName
+		authUserName := r.Header.Get("X-AuthUserName")
+		oraUserName := r.Header.Get("X-LoginUserName")
+		oraUserPass := r.Header.Get("X-LoginPassword")
+		oraConnStr := r.Header.Get("X-LoginConnectionString")
+		allowManyConnection := r.Header.Get("X-LoginMany") == "true"
+		var (
+			maxConcurrentConnectionsSetting int
+			err                             error
+		)
+		if maxConcurrentConnectionsSetting, err = strconv.Atoi(r.Header.Get("X-MaxConcurrentConnections")); err != nil {
+			maxConcurrentConnectionsSetting = 1
+		}
+
+		remoteUser := authUserName
 		if remoteUser == "" {
 			remoteUser = "-"
 		}
 
-		if !requestUserInfo {
-			// Авторизация от клиента не требуется.
-			// Используем значения по умолчанию
-			userName = defUserName
-			userPass = defUserPass
-		} else {
-			if !ok {
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte("Unauthorized"))
-				return
-			}
-		}
-		dumpFileName := expandFileName(fmt.Sprintf("${log_dir}/err_%s_${datetime}.log", userName))
+		// if !requestUserInfo {
+		// 	// Авторизация от клиента не требуется.
+		// 	// Используем значения по умолчанию
+		// 	userName = defUserName
+		// 	userPass = defUserPass
+		// } else {
+		// 	if !ok {
+		// 		w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
+		// 		w.WriteHeader(http.StatusUnauthorized)
+		// 		w.Write([]byte("Unauthorized"))
+		// 		return
+		// 	}
+		// }
+		dumpFileName := expandFileName(fmt.Sprintf("${log_dir}/err_%s_${datetime}.log", authUserName))
 
-		usrInfo, connStr := getConnectionParams(userName, grps)
+		//usrInfo, connStr := getConnectionParams(userName, grps)
 
-		if connStr == "" {
-			w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Unauthorized"))
-			return
-		}
+		// if connStr == "" {
+		// 	w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
+		// 	w.WriteHeader(http.StatusUnauthorized)
+		// 	w.Write([]byte("Unauthorized"))
+		// 	return
+		// }
 
-		sessionID := makeHandlerID(usrInfo.AllowConcurrentConnections, userName, userPass, r.Header.Get("DebugIP"), r)
+		sessionID := makeHandlerID(allowManyConnection, oraUserName, oraUserPass, r.Header.Get("DebugIP"), r)
 		taskID := makeTaskID(r)
 
 		cgiEnv := makeEnvParams(r, documentTable, remoteUser, requestUserRealm+"/")
@@ -508,8 +539,8 @@ func newOwa(
 			sessionIdleTimeout = math.MaxInt64
 		}
 		maxConcurrentConnections := 1
-		if usrInfo.AllowConcurrentConnections {
-			maxConcurrentConnections = usrInfo.MaxConcurrentConnections
+		if allowManyConnection {
+			maxConcurrentConnections = maxConcurrentConnectionsSetting
 		}
 		res := otasker.Run(
 			vpath,
@@ -517,9 +548,10 @@ func newOwa(
 			maxConcurrentConnections,
 			sessionID,
 			taskID,
-			userName,
-			userPass,
-			connStr,
+			authUserName,
+			oraUserName,
+			oraUserPass,
+			oraConnStr,
 			paramStoreProc,
 			beforeScript,
 			afterScript,
@@ -547,7 +579,7 @@ func newOwa(
 					Duration int64
 				}
 
-				responseTemplate(w, "rwait", templates["rwait"], DataInfo{userName, template.HTML(s), res.Duration})
+				responseTemplate(w, "rwait", templates["rwait"], DataInfo{authUserName, template.HTML(s), res.Duration})
 			}
 		case otasker.StatusBreakPage:
 			{
@@ -559,7 +591,7 @@ func newOwa(
 					Duration int64
 				}
 
-				responseTemplate(w, "rbreak", templates["rbreak"], DataInfo{userName, template.HTML(s), res.Duration})
+				responseTemplate(w, "rbreak", templates["rbreak"], DataInfo{authUserName, template.HTML(s), res.Duration})
 			}
 		case otasker.StatusRequestWasInterrupted:
 			{
@@ -660,6 +692,9 @@ type serverConfigHolder struct {
 		SessionIdleTimeout int    `json:"owa.SessionIdleTimeout"`
 		SessionWaitTimeout int    `json:"owa.SessionWaitTimeout"`
 		RequestUserInfo    bool   `json:"owa.ReqUserInfo"`
+		AuthType           int    `json:"owa.AuthenticationMethod"`
+		AuthNTLMDBUserName string `json:"owa.AuthNTLMDBUserName"`
+		AuthNTLMDBUserPass string `json:"owa.AuthNTLMDBUserPass"`
 		RequestUserRealm   string `json:"owa.ReqUserRealm"`
 		DefUserName        string `json:"owa.DBUserName"`
 		DefUserPass        string `json:"owa.DBUserPass"`

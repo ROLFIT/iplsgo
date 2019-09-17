@@ -32,6 +32,7 @@ func Authenticator(authType int,
 			}
 			r.Header.Add("X-LoginConnectionString", connStr)
 			r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.AllowConcurrentConnections))
+			r.Header.Add("X-MaxConcurrentConnections", strconv.Itoa(usrInfo.MaxConcurrentConnections))
 
 			next(w, r, p)
 			return
@@ -58,6 +59,7 @@ func Authenticator(authType int,
 				}
 				r.Header.Add("X-LoginConnectionString", connStr)
 				r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.AllowConcurrentConnections))
+				r.Header.Add("X-MaxConcurrentConnections", strconv.Itoa(usrInfo.MaxConcurrentConnections))
 
 				w.Header().Set("Connection", "keep-alive")
 				w.Header().Set("Persistent-Auth", "true")
@@ -136,6 +138,7 @@ func Authenticator(authType int,
 				}
 				r.Header.Add("X-LoginConnectionString", connStr)
 				r.Header.Add("X-LoginMany", strconv.FormatBool(usrInfo.AllowConcurrentConnections))
+				r.Header.Add("X-MaxConcurrentConnections", strconv.Itoa(usrInfo.MaxConcurrentConnections))
 
 				next(w, r, p)
 			}

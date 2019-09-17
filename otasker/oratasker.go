@@ -40,6 +40,7 @@ type OracleTaskResult struct {
 type OracleTasker interface {
 	Run(sessionID,
 		taskID,
+		authUserName,
 		userName,
 		userPass,
 		connStr,
@@ -86,6 +87,7 @@ type oracleTasker struct {
 	connUserPass        string
 	connStr             string
 	sessID              string
+	authUserName        string
 	logRequestProceeded int
 	logErrorsNum        int
 	logSessionID        string
@@ -164,7 +166,7 @@ func (r *oracleTasker) CloseAndFree() error {
 	return nil
 }
 
-func (r *oracleTasker) Run(sessionID, taskID, userName, userPass, connStr,
+func (r *oracleTasker) Run(sessionID, taskID, authUserName, userName, userPass, connStr,
 	paramStoreProc, beforeScript, afterScript, documentTable string,
 	cgiEnv map[string]string, procName string, urlParams url.Values,
 	reqFiles *mltpart.Form, dumpErrorFileName string) OracleTaskResult {
@@ -204,6 +206,7 @@ func (r *oracleTasker) Run(sessionID, taskID, userName, userPass, connStr,
 
 	bg := time.Now()
 	//var needDisconnect bool
+	r.authUserName = authUserName
 	var res = OracleTaskResult{}
 	if err := r.connect(userName, userPass, connStr); err != nil {
 		res.StatusCode, res.Content /*needDisconnect*/, _ = packError(err)
@@ -653,8 +656,15 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 		return errV("num_ext_params", "number", err)
 	}
 
-	stepStm := fmt.Sprintf(r.stmMain, stmExecDeclarePart.String(), stmExecSetPart.String(), beforeScript, stmExecStoreInContext.String(), procName, stmExecProcParams.String(), afterScript)
-	stepStmForShowing := fmt.Sprintf(r.stmMain, stmShowDeclarePart.String(), stmShowSetPart.String(), beforeScript, stmShowStoreInContext.String(), procName, stmShowProcParams.String(), afterScript)
+	var stmSetAuthUser string
+	if r.authUserName != r.connUserName {
+		stmSetAuthUser = `
+  A2.UAPI.e_Set_User('` + r.authUserName + `');
+ `
+	}
+
+	stepStm := fmt.Sprintf(r.stmMain, stmExecDeclarePart.String(), stmSetAuthUser, stmExecSetPart.String(), beforeScript, stmExecStoreInContext.String(), procName, stmExecProcParams.String(), afterScript)
+	stepStmForShowing := fmt.Sprintf(r.stmMain, stmShowDeclarePart.String(), stmSetAuthUser, stmShowSetPart.String(), beforeScript, stmShowStoreInContext.String(), procName, stmShowProcParams.String(), afterScript)
 	stepStmParams := sqlParams
 
 	r.setStepInfo(stepRunNum, stepStm, stepStmForShowing, false)

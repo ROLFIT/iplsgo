@@ -40,6 +40,7 @@ func Run(
 	maxProcCount int,
 	sessionID,
 	taskID,
+	authUserName,
 	userName,
 	userPass,
 	connStr,
@@ -92,6 +93,7 @@ func Run(
 		wrk := &work{
 			sessionID:         sessionID,
 			taskID:            taskID,
+			authUserName:      authUserName,
 			oraTaskerFactory:  taskerFactory[typeTasker],
 			outChan:           taskStat.outChan,
 			reqUserName:       userName,
@@ -169,6 +171,7 @@ func Break(path, sessionID string) error {
 type work struct {
 	sessionID         string
 	taskID            string
+	authUserName      string
 	oraTaskerFactory  func() oracleTasker
 	outChan           chan<- OracleTaskResult
 	reqUserName       string
@@ -221,6 +224,7 @@ func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration
 				}
 				res := w.Run(wrk.sessionID,
 					wrk.taskID,
+					wrk.authUserName,
 					wrk.reqUserName,
 					wrk.reqUserPass,
 					wrk.reqConnStr,
