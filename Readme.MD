@@ -1,8 +1,14 @@
+### iplsgo
+
+Пример сборки
+
 docker build -t oracle-instantclient-12-1 -f Dockerfile.oracle-instantclient.12.1 .
 docker build -t go153-oracle-instantclient-12-1 -f Dockerfile.base-builder .
 
 docker build -t iplsgo-builder --no-cache -f Dockerfile.build .
 docker run --rm iplsgo-builder | docker build --no-cache -t iplsgo -f Dockerfile.run -
+
+Пример запуска
 
 docker run --rm -p 221$2:25111 -p 222$2:25112 \
 -e SRC_URL=???? \
@@ -16,10 +22,4 @@ docker run --rm -p 221$2:25111 -p 222$2:25112 \
 -v $HOME/assets/trunk/apex5:/apex5 \
 -v $HOME/assets/trunk/wwwroot:/wwwroot \
 -v $HOME/assets/tst$2/rolf:/ext/tst$2 \
---name=ipls_tst$2 iplsgo 
-
-#!/bin/bash
-# Delete all containers
-docker rm $(docker ps -a -q)
-# Delete all images
-docker rmi $(docker images -q)
+--name=ipls_tst$2 iplsgo

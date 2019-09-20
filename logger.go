@@ -121,7 +121,8 @@ func (l *loggedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		url = url + "?" + params
 	}
 
-	writeToLog(fmt.Sprintf("%s, %s, %20s, %s, %s, %12d, %12d, %8d, %d, %s, %s, %v\r\n",
+	writeToLog(fmt.Sprintf("%s, %s, %s, %20s, %s, %s, %12d, %12d, %8d, %d, %s, %s, %v\r\n",
+		Version,
 		r.Host,
 		r.RemoteAddr,
 		user,
