@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vsdutka/metrics"
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/metrics"
+	"github.com/rolfit/mltpart"
 )
 
 var numberOfSessions = metrics.NewInt("PersistentHandler_Number_Of_Sessions", "Server - Number of persistent sessions", "Pieces", "p")
@@ -87,7 +87,14 @@ func Run(
 	dTasks.taskLock.RUnlock()
 	if !ok {
 		taskStat = &taskStatus{
-			outChan:   make(chan OracleTaskResult),
+			// В первую очередь буфер в канале нужен в следующем сценарии:
+			// 1. Запускаем "долгоиграющий" запрос, который приводит к выходу
+			//    из ожидания результата по таймауту
+			// 2. Закрываем окно c запросом
+			// 3. Убиваем сессию из другого окна
+			// 4. У воркера должна быть возможность завершить работу, хотя
+			//    результат читать уже некому
+			outChan:   make(chan OracleTaskResult, 1),
 			startTime: time.Now(),
 		}
 		wrk := &work{

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vsdutka/metrics"
+	"github.com/rolfit/metrics"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/goracle.v1/oracle"
 )

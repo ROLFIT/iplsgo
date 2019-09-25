@@ -23,10 +23,10 @@ import (
 	"github.com/kardianos/osext"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/vsdutka/iplsgo/otasker"
-	"github.com/vsdutka/metrics"
-	"github.com/vsdutka/mltpart"
-	NSPercentEncoding "github.com/vsdutka/nspercent-encoding"
+	"github.com/rolfit/iplsgo/otasker"
+	"github.com/rolfit/metrics"
+	"github.com/rolfit/mltpart"
+	NSPercentEncoding "github.com/rolfit/nspercent-encoding"
 )
 
 const (

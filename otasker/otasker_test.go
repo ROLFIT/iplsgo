@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vsdutka/mltpart"
+	"github.com/rolfit/mltpart"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/goracle.v1/oracle"
 )

@@ -60,19 +60,19 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/vsdutka/metrics"
+  name = "github.com/rolfit/metrics"
   packages = ["."]
   revision = "a3f544b3c54c180a674512bae9dbd498a9182ae4"
 
 [[projects]]
   branch = "master"
-  name = "github.com/vsdutka/mltpart"
+  name = "github.com/rolfit/mltpart"
   packages = ["."]
   revision = "bd089b8cd64f26a6d4628188a0494e1f6fb61eab"
 
 [[projects]]
   branch = "master"
-  name = "github.com/vsdutka/nspercent-encoding"
+  name = "github.com/rolfit/nspercent-encoding"
   packages = ["."]
   revision = "6c1a4159972a9276fad4e6d6b373c2104f974324"
 

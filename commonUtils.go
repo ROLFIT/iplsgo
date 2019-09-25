@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/pborman/uuid"
-	"github.com/vsdutka/iplsgo/otasker"
+	"github.com/rolfit/iplsgo/otasker"
 )
 
 func makeHandlerID(allowConcurrentConnections bool, userName, userPass, debugIP string, req *http.Request) string {

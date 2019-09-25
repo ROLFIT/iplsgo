@@ -11,7 +11,7 @@ import (
 
 	"github.com/alexbrainman/sspi"
 	ntlm_b "github.com/alexbrainman/sspi/ntlm"
-	"github.com/vsdutka/metrics"
+	"github.com/rolfit/metrics"
 )
 
 type AuthContext interface {
