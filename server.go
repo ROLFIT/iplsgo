@@ -78,8 +78,6 @@ func startServer() {
 		logInfof("Main listener starting on port \"%d\"\n", confHTTPPort)
 	}
 	go func() {
-		//		handler := http.NewServeMux()
-		//		handler.HandleFunc("/", serveHTTP)
 		serverHTTP := &http.Server{Addr: fmt.Sprintf(":%d", confHTTPPort),
 			ReadTimeout:  time.Duration(confHTTPReadTimeout) * time.Millisecond,
 			WriteTimeout: time.Duration(confHTTPWriteTimeout) * time.Millisecond,
@@ -92,7 +90,6 @@ func startServer() {
 					connCounter.Add(-1)
 				}
 			},
-			//Handler: handler,
 			Handler: &loggedHandler{func() http.Handler {
 				confLock.RLock()
 				defer confLock.RUnlock()
@@ -143,7 +140,6 @@ func startServer() {
 
 }
 func stopServer() {
-	//	s.configReader.shutdown()
 }
 
 func init() {
@@ -191,8 +187,6 @@ func serveHTTP(w http.ResponseWriter, r *http.Request) {
 		user,
 		end.Format("2006.01.02"),
 		end.Format("15:04:05.000000000"),
-		//r.Proto,
-		//r.Host,
 		length,
 		r.ContentLength,
 		time.Since(start)/time.Millisecond,
@@ -302,22 +296,6 @@ func parseConfig(buf []byte) error {
 							c.Handlers[k].DocumentTable,
 							templates))
 
-					// f := newOwa(
-					// 	upath,
-					// 	typeTasker,
-					// 	time.Duration(c.Handlers[k].SessionIdleTimeout)*time.Millisecond,
-					// 	time.Duration(c.Handlers[k].SessionWaitTimeout)*time.Millisecond,
-					// 	c.Handlers[k].RequestUserInfo,
-					// 	c.Handlers[k].RequestUserRealm,
-					// 	c.Handlers[k].DefUserName,
-					// 	c.Handlers[k].DefUserPass,
-					// 	c.Handlers[k].BeforeScript,
-					// 	c.Handlers[k].AfterScript,
-					// 	c.Handlers[k].ParamStoreProc,
-					// 	c.Handlers[k].DocumentTable,
-					// 	templates,
-					// 	grps)
-
 					newRouter.GET(upath+"/*proc", f)
 					newRouter.POST(upath+"/*proc", f)
 				}
@@ -334,38 +312,6 @@ func parseConfig(buf []byte) error {
 				}
 			}
 		}
-		//		newRouter.GET("/debug/conf/server", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		//			c := serverConfigHolder{
-		//				ServiceName:      confServiceName,
-		//				ServiceDispName:  confServiceDispName,
-		//				HTTPPort:         confHTTPPort,
-		//				HTTPDebugPort:    confHTTPDebugPort,
-		//				HTTPReadTimeout:  confHTTPReadTimeout,
-		//				HTTPWriteTimeout: confHTTPWriteTimeout,
-		//				HTTPSsl:          confHTTPSsl,
-		//				HTTPSslCert:      confHTTPSslCert,
-		//				HTTPSslKey:       confHTTPSslKey,
-		//				HTTPLogDir:       confHTTPLogDir,
-		//			}
-		//			buf, err := json.Marshal(c)
-		//			if err != nil {
-		//				w.WriteHeader(http.StatusOK)
-		//				w.Write([]byte(err.Error()))
-		//				return
-		//			}
-		//			w.WriteHeader(http.StatusOK)
-		//			w.Write(buf)
-		//		})
-		//		newRouter.GET("/debug/conf/users", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		//			buf, err := getUsers()
-		//			if err != nil {
-		//				w.WriteHeader(http.StatusOK)
-		//				w.Write([]byte(err.Error()))
-		//				return
-		//			}
-		//			w.WriteHeader(http.StatusOK)
-		//			w.Write(buf)
-		//		})
 		// Начинаем изменять параметры
 		confLock.Lock()
 		defer confLock.Unlock()
@@ -445,10 +391,7 @@ func newOwa(
 	typeTasker int,
 	sessionIdleTimeout,
 	sessionWaitTimeout time.Duration,
-	//requestUserInfo bool,
 	requestUserRealm,
-	//defUserName,
-	//defUserPass,
 	beforeScript,
 	afterScript,
 	paramStoreProc,
@@ -470,8 +413,6 @@ func newOwa(
 			return
 		}
 
-		//userName, userPass, ok := r.BasicAuth()
-
 		authUserName := r.Header.Get("X-AuthUserName")
 		oraUserName := r.Header.Get("X-LoginUserName")
 		oraUserPass := r.Header.Get("X-LoginPassword")
@@ -490,29 +431,7 @@ func newOwa(
 			remoteUser = "-"
 		}
 
-		// if !requestUserInfo {
-		// 	// Авторизация от клиента не требуется.
-		// 	// Используем значения по умолчанию
-		// 	userName = defUserName
-		// 	userPass = defUserPass
-		// } else {
-		// 	if !ok {
-		// 		w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
-		// 		w.WriteHeader(http.StatusUnauthorized)
-		// 		w.Write([]byte("Unauthorized"))
-		// 		return
-		// 	}
-		// }
 		dumpFileName := expandFileName(fmt.Sprintf("${log_dir}/err_%s_${datetime}.log", authUserName))
-
-		//usrInfo, connStr := getConnectionParams(userName, grps)
-
-		// if connStr == "" {
-		// 	w.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=\"%s%s\"", r.Host, requestUserRealm))
-		// 	w.WriteHeader(http.StatusUnauthorized)
-		// 	w.Write([]byte("Unauthorized"))
-		// 	return
-		// }
 
 		sessionID := makeHandlerID(allowManyConnection, oraUserName, oraUserPass, r.Header.Get("DebugIP"), r)
 		taskID := makeTaskID(r)
