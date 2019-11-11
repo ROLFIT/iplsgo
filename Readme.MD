@@ -1,12 +1,14 @@
 ### iplsgo
 
-Пример сборки
+#### Сборка приложения
 
-docker build -t oracle-instantclient-12-1 -f Dockerfile.oracle-instantclient.12.1 .
-docker build -t go153-oracle-instantclient-12-1 -f Dockerfile.base-builder .
+Для сборки приложения требуется golang:
+https://dp-file/files/golang/
 
-docker build -t iplsgo-builder --no-cache -f Dockerfile.build .
-docker run --rm iplsgo-builder | docker build --no-cache -t iplsgo -f Dockerfile.run -
+#### Запуск приложения
+
+Для запуска приложения требуются внешние зависимости:
+https://dp-file/files/iplsgo/
 
 Пример запуска
 
@@ -23,3 +25,11 @@ docker run --rm -p 221$2:25111 -p 222$2:25112 \
 -v $HOME/assets/trunk/wwwroot:/wwwroot \
 -v $HOME/assets/tst$2/rolf:/ext/tst$2 \
 --name=ipls_tst$2 iplsgo
+
+#### Образ и контейнер Docker
+
+docker build -t oracle-instantclient-12-1 -f Dockerfile.oracle-instantclient.12.1 .
+docker build -t go153-oracle-instantclient-12-1 -f Dockerfile.base-builder .
+
+docker build -t iplsgo-builder --no-cache -f Dockerfile.build .
+docker run --rm iplsgo-builder | docker build --no-cache -t iplsgo -f Dockerfile.run -
