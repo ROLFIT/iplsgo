@@ -185,12 +185,13 @@ type FileHeader struct {
 }
 
 // Open opens and returns the FileHeader's associated File.
-func (fh *FileHeader) Open() (File, error) {
+func (fh *FileHeader) Open() (File, error, string) {
 	if b := fh.content; b != nil {
 		r := io.NewSectionReader(bytes.NewReader(b), 0, int64(len(b)))
-		return sectionReadCloser{r}, nil
+		return sectionReadCloser{r}, nil, ""
 	}
-	return os.Open(fh.tmpfile)
+	fl, err := os.Open(fh.tmpfile)
+	return fl, err, fh.tmpfile
 }
 
 // File is an interface to access the file part of a multipart message.
