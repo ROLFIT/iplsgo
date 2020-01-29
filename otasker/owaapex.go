@@ -155,6 +155,7 @@ declare
   l_pt_dc_id varchar2(40) := null; /*Для совместимости*/
   l_content_type varchar2(240) := :content_type; /*Для совместимости*/
 begin
+  %s
   owa.init_cgi_env(:num_params, :param_name, :param_val);
 /*%s %s*/
   :ret_name := apex_util.set_blob

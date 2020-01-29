@@ -161,6 +161,7 @@ declare
   l_session_id varchar2(40) := :session_id;/*Для совместимости*/
   l_request varchar2(40) := :request;/*Для совместимости*/
 begin
+  %s
   owa.init_cgi_env(:num_params, :param_name, :param_val);
   %s
   insert into %s(name, mime_type, doc_size, last_updated, content_type, blob_content, pt_dc_id)

@@ -116,6 +116,7 @@ declare
   l_request varchar2(40) := :request;/*Для совместимости*/
   l_mime_type varchar2(240) := :mime_type;/*Для совместимости*/
 begin
+  %s
   owa.init_cgi_env(:num_params, :param_name, :param_val);
   %s
   insert into %s(name, doc_size, last_updated, content_type, blob_content, PTDCD_ID)

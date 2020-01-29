@@ -1019,7 +1019,14 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 		return "", errV("sqlErrTrace", "varchar2(32767)", err)
 	}
 
-	stepStm := fmt.Sprintf(r.stmFileUpload, beforeScript, documentTable)
+	var stmSetAuthUser string
+	if r.authUserName != r.connUserName {
+		stmSetAuthUser = `
+  A2.UAPI.e_Set_User('` + r.authUserName + `');
+ `
+	}
+
+	stepStm := fmt.Sprintf(r.stmFileUpload, stmSetAuthUser, beforeScript, documentTable)
 	stepStmParams := map[string]interface{}{"num_params": numParamsVar,
 		"param_name":     paramNameVar,
 		"param_val":      paramValVar,
