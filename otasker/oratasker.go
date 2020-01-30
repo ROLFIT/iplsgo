@@ -868,10 +868,11 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		//_, fileNames[i] = filepath.Split(fileHeader.Filename)
 		fileNames[i] = ExtractFileName(fileHeader.Header.Get("Content-Disposition"))
 
-		fileReader, tmpFileName, err := fileHeader.Open()
+		fileReader, err := fileHeader.Open()
 		if err != nil {
 			return nil, err
 		}
+
 		fileContent, err := ioutil.ReadAll(fileReader)
 		if err != nil {
 			return nil, err
@@ -883,14 +884,18 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		if err != nil {
 			return nil, err
 		}
-		// если файл существует
-		if _, err := os.Stat(tmpFileName); err == nil {
-			if err = fileReader.Close(); err != nil{
-				return nil, err
-			}
-			if err = os.Remove(tmpFileName); err != nil {
-				return nil, err
-			}
+		
+		switch tmp := fileReader.(type) {
+		case *os.File:
+			go func(tmpFileName string){
+				// если файл существует
+				if _, err := os.Stat(tmpFileName); err == nil {
+					if err = fileReader.Close(); err == nil {
+						os.Remove(tmpFileName)
+					}
+				}
+			}(tmp.Name())
+		default:
 		}
 	}
 	return fileNames, nil
