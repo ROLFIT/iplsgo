@@ -868,7 +868,7 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		//_, fileNames[i] = filepath.Split(fileHeader.Filename)
 		fileNames[i] = ExtractFileName(fileHeader.Header.Get("Content-Disposition"))
 
-		fileReader, err, tmpFileName := fileHeader.Open()
+		fileReader, tmpFileName, err := fileHeader.Open()
 		if err != nil {
 			return nil, err
 		}
@@ -883,8 +883,11 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		if err != nil {
 			return nil, err
 		}
+		// если файл существует
 		if _, err := os.Stat(tmpFileName); err == nil {
-			err = fileReader.Close()
+			if err = fileReader.Close(); err != nil{
+				return nil, err
+			}
 			if err = os.Remove(tmpFileName); err != nil {
 				return nil, err
 			}
