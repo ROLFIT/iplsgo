@@ -885,7 +885,7 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 			return nil, err
 		}
 		
-		switch tmp := fileReader.(type) {
+		switch tf := fileReader.(type) {
 		case *os.File:
 			go func(tmpFileName string){
 				// если файл существует
@@ -894,7 +894,7 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 						os.Remove(tmpFileName)
 					}
 				}
-			}(tmp.Name())
+			}(tf.Name())
 		default:
 		}
 	}
