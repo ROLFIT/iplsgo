@@ -2,7 +2,7 @@ package main
 
 const (
 	// Version app
-	Version = "1.0.193"
+	Version = "1.0.194"
 	// BuildDate time app
-	BuildDate = "28-01-2020 10:00:00.0000000+03:00"
+	BuildDate = "17-08-2020 10:00:00.0000000+03:00"
 )
