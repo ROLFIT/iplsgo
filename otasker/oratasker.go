@@ -882,6 +882,7 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		if err != nil {
 			return nil, err
 		}
+
 		fileContent, err := ioutil.ReadAll(fileReader)
 		if err != nil {
 			return nil, err
@@ -892,6 +893,19 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 			cgiEnv, urlParams, fileNames[i], fileHeader.LastArg, fileContentType, fileContentType, fileContent)
 		if err != nil {
 			return nil, err
+		}
+		
+		switch tf := fileReader.(type) {
+		case *os.File:
+			go func(tmpFileName string){
+				// если файл существует
+				if _, err := os.Stat(tmpFileName); err == nil {
+					if err = fileReader.Close(); err == nil {
+						os.Remove(tmpFileName)
+					}
+				}
+			}(tf.Name())
+		default:
 		}
 	}
 	return fileNames, nil
