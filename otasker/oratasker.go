@@ -166,10 +166,22 @@ func (r *oracleTasker) CloseAndFree() error {
 	return nil
 }
 
-func (r *oracleTasker) Run(sessionID, taskID, authUserName, userName, userPass, connStr,
-	paramStoreProc, beforeScript, afterScript, documentTable string,
-	cgiEnv map[string]string, procName string, urlParams url.Values,
-	reqFiles *mltpart.Form, dumpErrorFileName string) OracleTaskResult {
+func (r *oracleTasker) Run(
+	sessionID,
+	taskID,
+	authUserName,
+	userName,
+	userPass,
+	connStr,
+	paramStoreProc,
+	beforeScript,
+	afterScript,
+	documentTable string,
+	cgiEnv map[string]string,
+	procName string,
+	urlParams url.Values,
+	reqFiles *mltpart.Form,
+	dumpErrorFileName string) OracleTaskResult {
 
 	r.cafMutex.Lock()
 
@@ -205,11 +217,11 @@ func (r *oracleTasker) Run(sessionID, taskID, authUserName, userName, userPass, 
 	}
 
 	bg := time.Now()
-	//var needDisconnect bool
 	r.authUserName = authUserName
 	var res = OracleTaskResult{}
+
 	if err := r.connect(userName, userPass, connStr); err != nil {
-		res.StatusCode, res.Content /*needDisconnect*/, _ = packError(err)
+		res.StatusCode, res.Content, _ = packError(err)
 		// Формируем дамп до закрытия соединения, чтобы получить корректный запрос из последнего шага
 		r.dumpError(userName, connStr, dumpErrorFileName, cgiEnv["HTTP_REFERER"], err)
 
@@ -222,37 +234,44 @@ func (r *oracleTasker) Run(sessionID, taskID, authUserName, userName, userPass, 
 			defer r.mt.Unlock()
 			r.logErrorsNum++
 		}()
+
 		return res
 	}
 
-	if err := r.run(&res, paramStoreProc, beforeScript, afterScript, documentTable,
-		cgiEnv, procName, urlParams, reqFiles); err != nil {
-		res.StatusCode, res.Content /*needDisconnect*/, _ = packError(err)
+	if err := r.run(
+		&res,
+		paramStoreProc,
+		beforeScript,
+		afterScript,
+		documentTable,
+		cgiEnv,
+		procName,
+		urlParams,
+		reqFiles); err != nil {
+		res.StatusCode, res.Content, _ = packError(err)
 		// Формируем дамп до закрытия соединения, чтобы получить корректный запрос из последнего шага
 		r.dumpError(userName, connStr, dumpErrorFileName, cgiEnv["HTTP_REFERER"], err)
 
 		//Если произошла ошибка, всегда закрываем соединение с БД
 		r.disconnect()
 
-		//		if needDisconnect {
-		//			//Если произошла ошибка, всегда закрываем соединение с БД
-		//			r.disconnect()
-		//		}
 		res.Duration = int64(time.Since(bg) / time.Second)
 		func() {
 			r.mt.Lock()
 			defer r.mt.Unlock()
 			r.logErrorsNum++
 		}()
+
 		return res
 	}
+
 	res.StatusCode = http.StatusOK
 	res.Duration = int64(time.Since(bg) / time.Second)
+
 	return res
 }
 
 func (r *oracleTasker) connect(username, userpass, connstr string) (err error) {
-
 	if (r.conn == nil) || (r.connUserName != username) || (r.connUserPass != userpass) || (r.connStr != connstr) {
 		r.disconnect()
 
@@ -335,11 +354,18 @@ func (r *oracleTasker) evalSessionID() error {
 	return err
 }
 
-func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, afterScript, documentTable string,
-	cgiEnv map[string]string, procName string, urlParams url.Values, reqFiles *mltpart.Form) error {
+func (r *oracleTasker) run(
+	res *OracleTaskResult,
+	paramStoreProc,
+	beforeScript,
+	afterScript,
+	documentTable string,
+	cgiEnv map[string]string,
+	procName string,
+	urlParams url.Values,
+	reqFiles *mltpart.Form) error {
 
-	const (
-		initParams = `
+	const initParams = `
   l_num_params := :num_params;
   l_param_name := :param_name;
   l_param_val := :param_val;
@@ -348,7 +374,6 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
   l_ext_param_val := :ext_param_val;
   l_package_name := :package_name;
 `
-	)
 
 	var (
 		numParamsVar        *oracle.Variable
@@ -365,6 +390,7 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 		sqlErrMVar          *oracle.Variable
 		sqlErrTraceVar      *oracle.Variable
 	)
+
 	var (
 		stmExecDeclarePart bytes.Buffer
 		stmShowDeclarePart bytes.Buffer
@@ -378,10 +404,18 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 		stmShowStoreInContext bytes.Buffer
 	)
 
+	/*
+	 * Флаг используется для включения в логику скрипта вызова процедуры A2.UAPI.e_Set_User
+	 * Если флаг принимает значение [false], то добавить A2.UAPI.e_Set_User в скрипт можно
+	 * Если флаг принимает значение [true], то A2.UAPI.e_Set_User был ранее добавлен и повторно не требуется
+	 */
+	var isAddedProcSetUser bool
+
 	procNameParts := strings.Split(procName, "/")
 	if len(procNameParts) > 1 {
 		cgiEnv["X-APEX-BASE"] = "/" + procNameParts[0]
 	}
+
 	if !(len(procNameParts) > 1) {
 		err := func() error {
 			r.openStep(stepDescribeNum, "Describe")
@@ -390,12 +424,13 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			stm := "describe procedure \"" + procName + "\""
 			r.setStepInfo(stepDescribeNum, stm, stm, err == nil)
 			return err
-
 		}()
+
 		if err != nil {
 			return err
 		}
 	}
+
 	r.openStep(stepRunNum, "run")
 	defer r.closeStep(stepRunNum)
 
@@ -411,10 +446,12 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 		paramNameMaxLen int
 		paramValMaxLen  int
 	)
+
 	for key, val := range cgiEnv {
 		if len(key) > paramNameMaxLen {
 			paramNameMaxLen = len(key)
 		}
+
 		if len(val) > paramValMaxLen {
 			paramValMaxLen = len(val)
 		}
@@ -440,14 +477,12 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 	}
 	sort.Strings(cgiEnvKeys)
 
-	//i := uint(0)
 	for key := range cgiEnvKeys {
 		paramNameVar.SetValue(uint(key), cgiEnvKeys[key])
 		paramValVar.SetValue(uint(key), cgiEnv[cgiEnvKeys[key]])
 
 		stmShowSetPart.WriteString(fmt.Sprintf("  l_param_name(%d) := '%s';\n", key+1, cgiEnvKeys[key]))
 		stmShowSetPart.WriteString(fmt.Sprintf("  l_param_val(%d) := '%s';\n", key+1, cgiEnv[cgiEnvKeys[key]]))
-		//i++
 	}
 
 	if ContentTypeVar, err = cur.NewVariable(0, oracle.StringVarType, 1024); err != nil {
@@ -527,6 +562,7 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			&stmExecStoreInContext, &stmShowStoreInContext); err != nil {
 			return err
 		}
+
 		if err := prepareStringParam(cur, sqlParams, "amethod", []string{method},
 			"varchar2", "",
 			&stmExecDeclarePart, &stmShowDeclarePart,
@@ -535,6 +571,7 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			&stmExecStoreInContext, &stmShowStoreInContext); err != nil {
 			return err
 		}
+
 		if err := prepareStringParam(cur, sqlParams, "aurl", []string{url},
 			"varchar2", "",
 			&stmExecDeclarePart, &stmShowDeclarePart,
@@ -543,35 +580,53 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			&stmExecStoreInContext, &stmShowStoreInContext); err != nil {
 			return err
 		}
+
 		pkgName := ""
 		var pnVar *oracle.Variable
-		pnVar, err = cur.NewVariable(0, oracle.StringVarType, 80)
-		if err != nil {
+		if pnVar, err = cur.NewVariable(0, oracle.StringVarType, 80); err != nil {
 			return errV("package_name", "varchar2", err)
 		}
+
 		pnVar.SetValue(0, pkgName)
 		sqlParams["package_name"] = pnVar
-
 	} else {
 		if reqFiles != nil {
 			for paramName, paramValue := range reqFiles.File {
-				fileName, err := r.saveFile(paramStoreProc, beforeScript, afterScript, documentTable,
-					cgiEnv, urlParams, paramValue)
-				if err != nil {
+				var (
+					fileName []string
+					err      error
+				)
+
+				if fileName, isAddedProcSetUser, err = r.saveFile(
+					paramStoreProc,
+					beforeScript,
+					afterScript,
+					documentTable,
+					cgiEnv,
+					urlParams,
+					paramValue,
+					isAddedProcSetUser); err != nil {
 					return err
 				}
 
 				paramType, paramTypeName, _ := ArgumentInfo(r.connStr, procName, paramName)
 
-				err = prepareParam(cur, sqlParams,
-					paramName, fileName,
-					paramType, paramTypeName,
+				if err = prepareParam(
+					cur,
+					sqlParams,
+					paramName,
+					fileName,
+					paramType,
+					paramTypeName,
 					paramStoreProc,
-					&stmExecDeclarePart, &stmShowDeclarePart,
-					&stmExecSetPart, &stmShowSetPart,
-					&stmExecProcParams, &stmShowProcParams,
-					&stmExecStoreInContext, &stmShowStoreInContext)
-				if err != nil {
+					&stmExecDeclarePart,
+					&stmShowDeclarePart,
+					&stmExecSetPart,
+					&stmShowSetPart,
+					&stmExecProcParams,
+					&stmShowProcParams,
+					&stmExecStoreInContext,
+					&stmShowStoreInContext); err != nil {
 					return err
 				}
 
@@ -590,15 +645,22 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			if paramName != "" {
 				paramType, paramTypeName, _ := ArgumentInfo(r.connStr, procName, paramName)
 
-				err = prepareParam(cur, sqlParams,
-					paramName, paramValue,
-					paramType, paramTypeName,
+				if err = prepareParam(
+					cur,
+					sqlParams,
+					paramName,
+					paramValue,
+					paramType,
+					paramTypeName,
 					paramStoreProc,
-					&stmExecDeclarePart, &stmShowDeclarePart,
-					&stmExecSetPart, &stmShowSetPart,
-					&stmExecProcParams, &stmShowProcParams,
-					&stmExecStoreInContext, &stmShowStoreInContext)
-				if err != nil {
+					&stmExecDeclarePart,
+					&stmShowDeclarePart,
+					&stmExecSetPart,
+					&stmShowSetPart,
+					&stmExecProcParams,
+					&stmShowProcParams,
+					&stmExecStoreInContext,
+					&stmShowStoreInContext); err != nil {
 					return err
 				}
 
@@ -614,20 +676,21 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 				}
 			}
 		}
+
 		var pkgName string
-		_, pkgName, err = ProcedureInfo(r.connStr, procName)
-		if err != nil {
+		if _, pkgName, err = ProcedureInfo(r.connStr, procName); err != nil {
 			return err
 		}
 
 		var pnVar *oracle.Variable
-		pnVar, err = cur.NewVariable(0, oracle.StringVarType, 80)
-		if err != nil {
+		if pnVar, err = cur.NewVariable(0, oracle.StringVarType, 80); err != nil {
 			return errV("package_name", "varchar2", err)
 		}
+
 		pnVar.SetValue(0, pkgName)
 		sqlParams["package_name"] = pnVar
 	}
+
 	stmExecSetPart.WriteString(fmt.Sprintf("  l_num_ext_params := %d;\n", int32(len(extParamName))))
 	stmShowSetPart.WriteString(fmt.Sprintf("  l_num_ext_params := %d;\n", int32(len(extParamName))))
 	for key, val := range extParamName {
@@ -657,10 +720,11 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 	}
 
 	var stmSetAuthUser string
-	if r.authUserName != r.connUserName {
+	if isAddedProcSetUser == false && r.authUserName != r.connUserName {
 		stmSetAuthUser = `
   A2.UAPI.e_Set_User('` + r.authUserName + `');
  `
+		isAddedProcSetUser = true
 	}
 
 	stepStm := fmt.Sprintf(r.stmMain, stmExecDeclarePart.String(), stmSetAuthUser, stmExecSetPart.String(), beforeScript, stmExecStoreInContext.String(), procName, stmExecProcParams.String(), afterScript)
@@ -704,6 +768,7 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 	if err != nil {
 		return err
 	}
+
 	if ch != nil {
 		res.Headers = parseHeaders(ch.(string))
 	}
@@ -731,15 +796,18 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			if err != nil {
 				return err
 			}
+
 			if data == nil {
 				return nil
 			}
+
 			// Oracle возвращает данные ВСЕГДА в UTF-8
 			res.Content = append(res.Content, []byte(addCR(data.(string)))...)
 			bNextChunkExists, err := bNextChunkExistsVar.GetValue(0)
 			if err != nil {
 				return err
 			}
+
 			if bNextChunkExists.(int32) != 0 {
 				r.getRestChunks(res)
 			}
@@ -759,21 +827,24 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 			if err != nil {
 				return err
 			}
+
 			ext, ok := data.(*oracle.ExternalLobVar)
 			if !ok {
 				return errgo.Newf("data is not *ExternalLobVar, but %T", data)
 			}
+
 			if ext != nil {
 				size, err := ext.Size(false)
 				if err != nil {
 					fmt.Println("size error: ", err)
 				}
+
 				if size != 0 {
-					//Было так
 					res.Content, err = ext.ReadAll()
 					if err != nil {
 						return err
 					}
+
 					if res.ContentType == "" {
 						res.ContentType = http.DetectContentType(res.Content)
 					}
@@ -782,7 +853,8 @@ func (r *oracleTasker) run(res *OracleTaskResult, paramStoreProc, beforeScript, 
 
 		}
 	}
-	if res.ContentType == "" /*&& (len(res.Content) > 0)*/ {
+
+	if res.ContentType == "" {
 		res.ContentType = "text/html"
 	}
 
@@ -865,9 +937,18 @@ func (r *oracleTasker) getRestChunks(res *OracleTaskResult) error {
 	return nil
 }
 
-func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, documentTable string,
-	cgiEnv map[string]string, urlParams url.Values, fileHeaders []*mltpart.FileHeader) ([]string, error) {
+func (r *oracleTasker) saveFile(
+	paramStoreProc,
+	beforeScript,
+	afterScript,
+	documentTable string,
+	cgiEnv map[string]string,
+	urlParams url.Values,
+	fileHeaders []*mltpart.FileHeader,
+	isAddedProcSetUser bool) ([]string, bool, error) {
+
 	fileNames := make([]string, len(fileHeaders))
+
 	for i, fileHeader := range fileHeaders {
 		//Если Header == nil, значит заголовок сделан из значения параметра, переданного как строковая
 		//просто добавляем в список имен
@@ -875,29 +956,39 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 			fileNames[i] = fileHeader.Filename
 			continue
 		}
-		//_, fileNames[i] = filepath.Split(fileHeader.Filename)
+
 		fileNames[i] = ExtractFileName(fileHeader.Header.Get("Content-Disposition"))
 
 		fileReader, err := fileHeader.Open()
 		if err != nil {
-			return nil, err
+			return nil, isAddedProcSetUser, err
 		}
 
 		fileContent, err := ioutil.ReadAll(fileReader)
 		if err != nil {
-			return nil, err
+			return nil, isAddedProcSetUser, err
 		}
-		//_ = fileContent
+
 		fileContentType := fileHeader.Header.Get("Content-Type")
-		fileNames[i], err = r.saveFileToDB(paramStoreProc, beforeScript, afterScript, documentTable,
-			cgiEnv, urlParams, fileNames[i], fileHeader.LastArg, fileContentType, fileContentType, fileContent)
-		if err != nil {
-			return nil, err
+		if fileNames[i], isAddedProcSetUser, err = r.saveFileToDB(
+			paramStoreProc,
+			beforeScript,
+			afterScript,
+			documentTable,
+			cgiEnv,
+			urlParams,
+			fileNames[i],
+			fileHeader.LastArg,
+			fileContentType,
+			fileContentType,
+			fileContent,
+			isAddedProcSetUser); err != nil {
+			return nil, isAddedProcSetUser, err
 		}
-		
+
 		switch tf := fileReader.(type) {
 		case *os.File:
-			go func(tmpFileName string){
+			go func(tmpFileName string) {
 				// если файл существует
 				if _, err := os.Stat(tmpFileName); err == nil {
 					if err = fileReader.Close(); err == nil {
@@ -908,15 +999,29 @@ func (r *oracleTasker) saveFile(paramStoreProc, beforeScript, afterScript, docum
 		default:
 		}
 	}
-	return fileNames, nil
+
+	return fileNames, isAddedProcSetUser, nil
 }
 
-func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, documentTable string,
-	cgiEnv map[string]string, urlParams url.Values, fName, fItem, fMime, fContentType string, fContent []byte) (string, error) {
+func (r *oracleTasker) saveFileToDB(
+	paramStoreProc,
+	beforeScript,
+	afterScript,
+	documentTable string,
+	cgiEnv map[string]string,
+	urlParams url.Values,
+	fName,
+	fItem,
+	fMime,
+	fContentType string,
+	fContent []byte,
+	isAddedProcSetUser bool) (string, bool, error) {
 
 	r.openStep(stepSaveFileToDBNum, "saveFileToDB")
+	defer r.closeStep(stepSaveFileToDBNum)
+
 	cur := r.conn.NewCursor()
-	defer func() { cur.Close(); r.closeStep(stepSaveFileToDBNum) }()
+	defer cur.Close()
 
 	numParams := int32(len(cgiEnv))
 
@@ -924,6 +1029,7 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 		paramNameMaxLen int
 		paramValMaxLen  int
 	)
+
 	for key, val := range cgiEnv {
 		if len(key) > paramNameMaxLen {
 			paramNameMaxLen = len(key)
@@ -932,17 +1038,18 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 			paramValMaxLen = len(val)
 		}
 	}
+
 	numParamsVar, err := cur.NewVar(&numParams)
 	if err != nil {
-		return "", errV(numParams, numParams, err)
+		return "", isAddedProcSetUser, errV(numParams, numParams, err)
 	}
 	paramNameVar, err := cur.NewVariable(uint(numParams), oracle.StringVarType, uint(paramNameMaxLen))
 	if err != nil {
-		return "", errV("paramName", "string", err)
+		return "", isAddedProcSetUser, errV("paramName", "string", err)
 	}
 	paramValVar, err := cur.NewVariable(uint(numParams), oracle.StringVarType, uint(paramValMaxLen))
 	if err != nil {
-		return "", errV("paramVal", "string", err)
+		return "", isAddedProcSetUser, errV("paramVal", "string", err)
 	}
 
 	i := uint(0)
@@ -953,32 +1060,32 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 	}
 	nameVar, err := cur.NewVar(&fName)
 	if err != nil {
-		return "", errV(fName, fName, err)
+		return "", isAddedProcSetUser, errV(fName, fName, err)
 	}
 
 	mimeVar, err := cur.NewVar(&fMime)
 	if err != nil {
-		return "", errV(fMime, fMime, err)
+		return "", isAddedProcSetUser, errV(fMime, fMime, err)
 	}
 
 	ContentTypeVar, err := cur.NewVar(&fContentType)
 	if err != nil {
-		return "", errV(fContentType, fContentType, err)
+		return "", isAddedProcSetUser, errV(fContentType, fContentType, err)
 	}
 
 	docSize := len(fContent)
 	docSizeVar, err := cur.NewVar(&docSize)
 	if err != nil {
-		return "", errV(docSize, docSize, err)
+		return "", isAddedProcSetUser, errV(docSize, docSize, err)
 	}
 
 	lobVar, err := cur.NewVariable(0, oracle.BlobVarType, uint(docSize))
 	if err != nil {
-		return "", errgo.Newf("error creating variable for %s(lob): %s", "lob", err)
+		return "", isAddedProcSetUser, errgo.Newf("error creating variable for %s(lob): %s", "lob", err)
 	}
 
 	if err := lobVar.SetValue(0, fContent); err != nil {
-		return "", errgo.Newf("error setting variable for %s(lob): %s", "lob", err)
+		return "", isAddedProcSetUser, errgo.Newf("error setting variable for %s(lob): %s", "lob", err)
 	}
 
 	itemID := fItem
@@ -990,30 +1097,30 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 
 	itemIDVar, err := cur.NewVar(&itemID)
 	if err != nil {
-		return "", errV(itemID, itemID, err)
+		return "", isAddedProcSetUser, errV(itemID, itemID, err)
 	}
 	applicationIDVar, err := cur.NewVar(&applicationID)
 	if err != nil {
-		return "", errV(applicationID, applicationID, err)
+		return "", isAddedProcSetUser, errV(applicationID, applicationID, err)
 	}
 
 	pageIDVar, err := cur.NewVar(&pageID)
 	if err != nil {
-		return "", errV(pageID, pageID, err)
+		return "", isAddedProcSetUser, errV(pageID, pageID, err)
 	}
 	sessionIDVar, err := cur.NewVar(&sessionID)
 	if err != nil {
-		return "", errV(sessionID, sessionID, err)
+		return "", isAddedProcSetUser, errV(sessionID, sessionID, err)
 	}
 	requestVar, err := cur.NewVar(&request)
 	if err != nil {
-		return "", errV(request, request, err)
+		return "", isAddedProcSetUser, errV(request, request, err)
 	}
 
 	retName := ""
 	retNameVar, err := cur.NewVar(&retName)
 	if err != nil {
-		return "", errV(retName, retName, err)
+		return "", isAddedProcSetUser, errV(retName, retName, err)
 	}
 
 	var (
@@ -1022,22 +1129,23 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 		sqlErrTraceVar *oracle.Variable
 	)
 	if sqlErrCodeVar, err = cur.NewVariable(0, oracle.Int32VarType, 0); err != nil {
-		return "", errV("sqlErrCode", "number", err)
+		return "", isAddedProcSetUser, errV("sqlErrCode", "number", err)
 	}
 
 	if sqlErrMVar, err = cur.NewVariable(0, oracle.StringVarType, 32767); err != nil {
-		return "", errV("sqlErrM", "varchar2(32767)", err)
+		return "", isAddedProcSetUser, errV("sqlErrM", "varchar2(32767)", err)
 	}
 
 	if sqlErrTraceVar, err = cur.NewVariable(0, oracle.StringVarType, 32767); err != nil {
-		return "", errV("sqlErrTrace", "varchar2(32767)", err)
+		return "", isAddedProcSetUser, errV("sqlErrTrace", "varchar2(32767)", err)
 	}
 
 	var stmSetAuthUser string
-	if r.authUserName != r.connUserName {
+	if isAddedProcSetUser == false && r.authUserName != r.connUserName {
 		stmSetAuthUser = `
   A2.UAPI.e_Set_User('` + r.authUserName + `');
  `
+		isAddedProcSetUser = true
 	}
 
 	stepStm := fmt.Sprintf(r.stmFileUpload, stmSetAuthUser, beforeScript, documentTable)
@@ -1062,34 +1170,39 @@ func (r *oracleTasker) saveFileToDB(paramStoreProc, beforeScript, afterScript, d
 	r.setStepInfo(stepSaveFileToDBNum, stepStm, stepStm, false)
 
 	if err := cur.Execute(stepStm, nil, stepStmParams); err != nil {
-		return "", err
+		return "", isAddedProcSetUser, err
 	}
+
 	sqlErrCode, err := sqlErrCodeVar.GetValue(0)
 	if err != nil {
-		return "", err
+		return "", isAddedProcSetUser, err
 	}
 
 	if sqlErrCode.(int32) != 0 {
 		sqlErrM, err := sqlErrMVar.GetValue(0)
 		if err != nil {
-			return "", err
+			return "", isAddedProcSetUser, err
 		}
+
 		sqlErrTrace, err := sqlErrTraceVar.GetValue(0)
 		if err != nil {
-			return "", err
+			return "", isAddedProcSetUser, err
 		}
-		return "", oracle.NewErrorAt(int(sqlErrCode.(int32)), sqlErrM.(string), sqlErrTrace.(string))
+
+		return "", isAddedProcSetUser, oracle.NewErrorAt(int(sqlErrCode.(int32)), sqlErrM.(string), sqlErrTrace.(string))
 	}
+
 	ret, e := retNameVar.GetValue(0)
 	if e != nil {
-		return "", err
+		return "", isAddedProcSetUser, err
 	}
 
 	r.setStepInfo(stepSaveFileToDBNum, stepStm, stepStm, true)
 	if ret == nil {
-		return "", nil
+		return "", isAddedProcSetUser, nil
 	}
-	return ret.(string), nil
+
+	return ret.(string), isAddedProcSetUser, nil
 }
 
 func (r *oracleTasker) openStep(stepNum int, stepType string) {

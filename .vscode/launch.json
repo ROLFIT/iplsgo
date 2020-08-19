@@ -31,11 +31,11 @@
                 "CGO_LDFLAGS":"-LD:\\oracle\\instantclient_12_1\\sdk\\lib -loci"
             },
             "args": [
-                "-dsn=iplsql_reader/1@dp-se-tst16",
-                "-conf=copy_of_COMMON",
+                "-dsn=iplsql_reader/1@dp-se-tst1",
+                "-conf=SE_unionASR.xcfg",
                 "-conf_tm=10",
                 "-host=DP-ASW3",
-                "-cs=DP-SE-TST16"
+                "-cs=DP-SE-TST1"
             ]
         },
         {
