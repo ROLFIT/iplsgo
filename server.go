@@ -433,7 +433,7 @@ func newOwa(
 
 		dumpFileName := expandFileName(fmt.Sprintf("${log_dir}/err_%s_${datetime}.log", authUserName))
 
-		sessionID := makeHandlerID(allowManyConnection, oraUserName, oraUserPass, r.Header.Get("DebugIP"), r)
+		sessionID := makeHandlerID(allowManyConnection, authUserName, r.Header.Get("DebugIP"), r)
 		taskID := makeTaskID(r)
 
 		cgiEnv := makeEnvParams(r, documentTable, remoteUser, requestUserRealm+"/")

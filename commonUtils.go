@@ -12,7 +12,7 @@ import (
 	"github.com/rolfit/iplsgo/otasker"
 )
 
-func makeHandlerID(allowConcurrentConnections bool, userName, userPass, debugIP string, req *http.Request) string {
+func makeHandlerID(allowConcurrentConnections bool, userName, debugIP string, req *http.Request) string {
 	addr := ""
 	if allowConcurrentConnections {
 		addr = req.Header.Get("X-Real-IP")
@@ -32,7 +32,7 @@ func makeHandlerID(allowConcurrentConnections bool, userName, userPass, debugIP 
 			debugIP = req.Header.Get("X-Request-Id")
 		}
 	}
-	return strings.ToUpper(userName + "|" + userPass + "|" + host + "|" + debugIP)
+	return strings.ToUpper(userName + "|" + host + "|" + debugIP)
 }
 
 func makeTaskID(req *http.Request) string {
