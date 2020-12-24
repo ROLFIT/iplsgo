@@ -51,7 +51,17 @@ func (d *Dispatcher) AssignTask(request *work, maxProcCount int, timeout time.Du
 	d.setupVacancies(maxProcCount, false)
 
 	vacancies := d.vacancies
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
 	for {
+		//Перезапустим таймер простоя
+		//Согласно документации делать это можно
+		//только после остановки таймера и чтения
+		//канала таймера
+		if !timeoutTimer.Stop() {
+			<-timeoutTimer.C
+		}
+		timeoutTimer.Reset(timeout)
 		//Первым делом проверим канал свободных исполнителей
 		select {
 		case d.taskQueue <- request:
@@ -83,7 +93,7 @@ func (d *Dispatcher) AssignTask(request *work, maxProcCount int, timeout time.Du
 				//создадим нового исполнителя
 				d.createProcessor()
 			}
-		case <-time.After(timeout):
+		case <-timeoutTimer.C:
 			{
 				//Исполнитель не был назначен в течение отведённого времени
 				return true, nil

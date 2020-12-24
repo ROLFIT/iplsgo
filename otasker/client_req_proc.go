@@ -134,6 +134,8 @@ func Run(
 		}
 	}
 	//Читаем результаты
+	timeoutTimer := time.NewTimer(waitTimeout)
+	defer timeoutTimer.Stop()
 	return func() OracleTaskResult {
 		select {
 		case res := <-taskStat.outChan:
@@ -146,7 +148,7 @@ func Run(
 				dTasks.taskLock.Unlock()
 			}
 			return res
-		case <-time.After(waitTimeout):
+		case <-timeoutTimer.C:
 			{
 				//Если задания нет в справочнике исполняемых,..
 				if !ok {
@@ -214,7 +216,18 @@ func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration
 		// Удаляем данный обработчик из списка доступных
 		w.CloseAndFree()
 	}()
+	idleTimer := time.NewTimer(idleTimeout)
+	defer idleTimer.Stop()
 	for {
+		//Перезапустим таймер простоя
+		//Согласно документации делать это можно
+		//только после остановки таймера и чтения
+		//канала таймера
+		if !idleTimer.Stop() {
+			<-idleTimer.C
+		}
+		idleTimer.Reset(idleTimeout)
+
 		select {
 		case <-w.stopSignal:
 			{
@@ -256,7 +269,7 @@ func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration
 				default:
 				}
 			}
-		case <-time.After(idleTimeout):
+		case <-idleTimer.C:
 			{
 				return
 			}

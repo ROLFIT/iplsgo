@@ -35,7 +35,10 @@ func getConnectionParams(user string, grps map[int32]string) (userInfo, string) 
 		return emptyUserInfo, ""
 	}
 	// Получаем глобальную строку соединения для ВСЕХ пользователей
-	sid := *conectionString
+	sid := ""
+	if conectionString != nil {
+		sid = *conectionString
+	}
 	// если она пустая, ищем среди данных конфигурации
 	if sid == "" {
 		if sid, ok = grps[uInfo.GrpID]; !ok {

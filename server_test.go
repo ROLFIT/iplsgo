@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/goracle.v1/oracle"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/errgo.v1"
+	"gopkg.in/goracle.v1/oracle"
 )
 
 type VD struct {
@@ -71,6 +73,11 @@ var (
 	testDsnSID   string
 	serverConf   sc
 )
+
+var _ = func() bool {
+	testing.Init()
+	return true
+}()
 
 func init() {
 	flag.Parse()
@@ -319,4 +326,38 @@ func TestExpandFileName(t *testing.T) {
 			t.Errorf("Response should be \"%s\", was \"%s\"", v.resStr, res)
 		}
 	}
+}
+
+func BenchmarkServe2(b *testing.B) {
+
+	buf, err := json.Marshal(serverConf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	resetConfig()
+	err = parseConfig(buf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	const url = "/ti8_a/srv$s?A_AG_ID=34343061&A_PT_DC_ID=3&A_CRRNCY_ID=2"
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	w := httptest.NewRecorder()
+
+	runtime.GC()
+	m := runtime.MemStats{}
+	runtime.ReadMemStats(&m)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		serveHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			b.Errorf("Method %s Url \"%s\" Status code should be %v, was %d", "GET", url, http.StatusOK, w.Code)
+		}
+	}
+	runtime.GC()
+	m2 := runtime.MemStats{}
+	runtime.ReadMemStats(&m2)
+	b.Log("MemDiff:", m2.HeapAlloc-m.HeapAlloc)
 }
