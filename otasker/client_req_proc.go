@@ -2,6 +2,7 @@
 package otasker
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ var (
 		ApexTasker:    NewOwaApexProcTasker(),
 		EkbTasker:     NewOwaEkbProcTasker(),
 	}
+	KillTimerDelay = time.Hour * 1
 )
 
 //Run выполняет задание, формируемое из входных параметров
@@ -96,7 +98,17 @@ func Run(
 			//    результат читать уже некому
 			outChan:   make(chan OracleTaskResult, 1),
 			startTime: time.Now(),
+			//Иногда возникает ситуация, когда taskStat с результатом
+			//выполнения задачи навсегда останется в коллекции dispatchersTasks
+			//то есть возникнет утечка памяти.
+			//Для этого достаточно, чтобы пользователь запустил задачу, которая
+			//не успеет выполнится до таймаута и попадёт в коллекцию dispatchersTasks
+			//Если после этого пользователь закроет вкладку браузера, то результат
+			//выполнения задачи навсегда останется в dispatchersTasks
+			killTimer:      time.NewTimer(KillTimerDelay + waitTimeout),
+			killTimerReset: make(chan struct{}, 1),
 		}
+
 		wrk := &work{
 			sessionID:         sessionID,
 			taskID:            taskID,
@@ -133,29 +145,52 @@ func Run(
 			return OracleTaskResult{StatusCode: StatusBreakPage, Duration: taskDurationSeconds}
 		}
 	}
-	//Читаем результаты
-	timeoutTimer := time.NewTimer(waitTimeout)
-	defer timeoutTimer.Stop()
 	return func() OracleTaskResult {
+		//Читаем результаты
+		timeoutTimer := time.NewTimer(waitTimeout)
+		defer timeoutTimer.Stop()
 		select {
 		case res := <-taskStat.outChan:
-			//Задание завершено
-			//Если задание есть в справочнике исполняемых,..
-			if ok {
-				//..то удалим его из справочника
-				dTasks.taskLock.Lock()
-				delete(dTasks.tasksInProgress, taskID)
-				dTasks.taskLock.Unlock()
-			}
+			fmt.Println("Задача выполнена")
+			//Задача выполнена -- остановим таймер очистки dispatchersTasks
+			taskStat.killTimer.Stop()
 			return res
 		case <-timeoutTimer.C:
 			{
+				//Пользователь всё ещё ждёт выполнения задачи --
+				//перезапустим таймер очистки dispatchersTasks
+				taskStat.killTimerReset <- struct{}{}
 				//Если задания нет в справочнике исполняемых,..
 				if !ok {
 					//..то добавим его в справочник
 					dTasks.taskLock.Lock()
 					dTasks.tasksInProgress[taskID] = taskStat
 					dTasks.taskLock.Unlock()
+					go func() {
+						for {
+							select {
+							case <-taskStat.killTimerReset:
+								//Согласно документации делать это можно
+								//только после остановки таймера и чтения
+								//канала таймера
+								if !taskStat.killTimer.Stop() {
+									<-taskStat.killTimer.C
+								}
+								taskStat.killTimer.Reset(KillTimerDelay + waitTimeout)
+							case <-taskStat.killTimer.C:
+								//Прошло время и таймер не был сброшен -- значит пользователь закрыл вкладку с червяком
+								//или таймер был остановлен по причине выполнения задания
+								//Удалим задание из справочника
+								dTasks.taskLock.Lock()
+								delete(dTasks.tasksInProgress, taskID)
+								dTasks.taskLock.Unlock()
+								//Мы не можем останавливать саму задачу -- возможно пользователь
+								//запустил длинную процедуру и закрыл вкладку (или выключил комп)
+								//Однако задача должна быть завершена штатно в таком случае
+								return
+							}
+						}
+					}()
 				}
 				taskDuration := time.Since(taskStat.startTime)
 				taskDurationSeconds := int64(taskDuration / time.Second)
@@ -211,23 +246,14 @@ func (w *clientReqProc) stop() {
 }
 
 func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration) {
+	idleTimer := time.NewTimer(idleTimeout)
 	defer func() {
 		w.stop()
 		// Удаляем данный обработчик из списка доступных
 		w.CloseAndFree()
+		idleTimer.Stop()
 	}()
-	idleTimer := time.NewTimer(idleTimeout)
-	defer idleTimer.Stop()
 	for {
-		//Перезапустим таймер простоя
-		//Согласно документации делать это можно
-		//только после остановки таймера и чтения
-		//канала таймера
-		if !idleTimer.Stop() {
-			<-idleTimer.C
-		}
-		idleTimer.Reset(idleTimeout)
-
 		select {
 		case <-w.stopSignal:
 			{
@@ -258,6 +284,14 @@ func (w *clientReqProc) listen(taskQueue <-chan *work, idleTimeout time.Duration
 					wrk.reqFiles,
 					wrk.dumpFileName)
 				outChan <- res
+				//Перезапустим таймер простоя
+				//Согласно документации делать это можно
+				//только после остановки таймера и чтения
+				//канала таймера
+				if !idleTimer.Stop() {
+					<-idleTimer.C
+				}
+				idleTimer.Reset(idleTimeout)
 				if res.StatusCode == StatusRequestWasInterrupted {
 					return
 				}
@@ -284,8 +318,10 @@ type dispatcherTasks struct {
 }
 
 type taskStatus struct {
-	outChan   chan OracleTaskResult
-	startTime time.Time
+	outChan        chan OracleTaskResult
+	startTime      time.Time
+	killTimer      *time.Timer
+	killTimerReset chan struct{}
 }
 
 type hr struct {

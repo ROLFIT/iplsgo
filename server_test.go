@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rolfit/iplsgo/otasker"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/goracle.v1/oracle"
 )
@@ -328,8 +328,19 @@ func TestExpandFileName(t *testing.T) {
 	}
 }
 
-func BenchmarkServe2(b *testing.B) {
-
+//BenchmarkLeakingOnTabClosedAfterTimeout проверяет наличие утечки памяти веб-сервера в ситуации
+//когда был достигнут таймаут выполнения задания и дальше была закрыта вкладка с заданием
+func BenchmarkLeakingOnTabClosedAfterTimeout(b *testing.B) {
+	/*
+		/ Запуск бенчмарка:
+		/ go test -v -run=XXX -bench=LeakingOnTabClosedAfterTimeout -benchtime 10x -memprofile memprofile.out -args -test-dsn=a/aaa111@dp-se-tst17
+		/
+		/ После того, как он отработает необходимо проанализировать собранный профиль памяти -- там не должно быть большого количества объектов
+		/ Для анализа выполнить
+		/ go tool pprof memprofile.out
+		/ И смотреть inuse_space
+	*/
+	//Настройка окружения для теста
 	buf, err := json.Marshal(serverConf)
 	if err != nil {
 		b.Fatal(err)
@@ -339,25 +350,61 @@ func BenchmarkServe2(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	const url = "/ti8_a/srv$s?A_AG_ID=34343061&A_PT_DC_ID=3&A_CRRNCY_ID=2"
 
+	err = exec(`begin
+	insert into a.UA_ACD4ORA_EXEC_OBJ(Object_Name, Acd_Id) select upper('mem_leak_test'), acd_id from a.UA_ACD4ORA_EXEC_OBJ t where t.object_name = upper('root$');
+	commit;
+	end;`)
+	if err != nil {
+		b.Fatal("Error when create UA_ACD4ORA_EXEC_OBJ", err.Error())
+	}
+	err = exec(`create or replace procedure a.mem_leak_test(p_duration in integer) is 
+	begin
+	  dbms_lock.sleep(p_duration);
+	  a.hrslt.ADD_FOOTER := false;
+	  for i in 1..10000 loop
+		htp.p('alskdbf134u5h0143oasdfn14395013asdfnJKFJDFB91hKJSFiuh((#*SIFBADFHBUS*34asdfbiba18430asidfiasjdfaas))');
+	  end loop;
+	end mem_leak_test;`)
+	if err != nil {
+		b.Fatal("Error when create procedure mem_leak_test", err.Error())
+	}
+	err = exec(`create or replace public synonym mem_leak_test for a.mem_leak_test`)
+	if err != nil {
+		b.Fatal("Error when create public synonym", err.Error())
+	}
+
+	const url = "/ti8_a/mem_leak_test?p_duration=13"
 	req, _ := http.NewRequest("GET", url, nil)
 
 	w := httptest.NewRecorder()
-
-	runtime.GC()
-	m := runtime.MemStats{}
-	runtime.ReadMemStats(&m)
+	otasker.KillTimerDelay = time.Second * 10
 	b.ResetTimer()
+
+	//Тест
 	for i := 0; i < b.N; i++ {
+		//mem_leak_test печатает 10Мб текста через время p_duration
+		//Если время p_duration превышает таймаут, то результат будет
+		//получен после первого возврата по таймауту (червяка)
 		serveHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			b.Errorf("Method %s Url \"%s\" Status code should be %v, was %d", "GET", url, http.StatusOK, w.Code)
 		}
 	}
-	runtime.GC()
-	m2 := runtime.MemStats{}
-	runtime.ReadMemStats(&m2)
-	b.Log("MemDiff:", m2.HeapAlloc-m.HeapAlloc)
+
+	//Чистка мусора после теста
+	err = exec("drop procedure a.mem_leak_test")
+	if err != nil {
+		b.Fatal("Error when drop procedure mem_leak_test", err.Error())
+	}
+	err = exec(`begin
+	delete from a.UA_ACD4ORA_EXEC_OBJ where Object_Name = upper('mem_leak_test');
+	commit;
+	end;`)
+	if err != nil {
+		b.Fatal("Error when delete data for mem_leak_test", err.Error())
+	}
+	//Подождём время для очистки всех незатребованных результатов
+	time.Sleep(otasker.KillTimerDelay * 2)
 }
