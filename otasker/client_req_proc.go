@@ -2,7 +2,6 @@
 package otasker
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 	"sync"
@@ -151,7 +150,6 @@ func Run(
 		defer timeoutTimer.Stop()
 		select {
 		case res := <-taskStat.outChan:
-			fmt.Println("Задача выполнена")
 			//Задача выполнена -- остановим таймер очистки dispatchersTasks
 			taskStat.killTimer.Stop()
 			return res
