@@ -192,7 +192,7 @@ func (r *oracleTasker) Run(
 		r.logRequestProceeded++
 		r.logSessionID = sessionID
 		r.logTaskID = taskID
-		r.logUserName = userName
+		r.logUserName = authUserName
 		r.logUserPass = userPass
 		r.logConnStr = connStr
 		r.logProcName = procName
