@@ -45,13 +45,10 @@ var (
 
 func init() {
 	go func() {
+		tiker := time.NewTicker(time.Second * 1)
 		for {
-			select {
-			case <-time.After(time.Second * 1):
-				{
-					ctx.cleanup()
-				}
-			}
+			<-tiker.C
+			ctx.cleanup()
 		}
 	}()
 }
@@ -208,6 +205,7 @@ func (c *contexts) cleanup() {
 	}
 	for _, id := range forClean {
 		ctxFree.Put(c.contexts[id])
+		c.contexts[id].sc.Release()
 		delete(c.contexts, id)
 		ctxCounter.Add(-1)
 	}
