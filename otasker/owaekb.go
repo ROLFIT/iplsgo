@@ -31,9 +31,10 @@ Begin
   /* >> Инициализация параметров */
 %s
   /* << Инициализация параметров */
-  %s
+  
   wscontext.e_init_cgi_env(l_num_params, l_param_name, l_param_val);
   wscontext.e_store_external_parameters(l_package_name, l_num_ext_params, l_ext_param_name, l_ext_param_val);
+  %s
 %s
   %s(%s);
   %s
