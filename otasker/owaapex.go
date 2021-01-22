@@ -31,8 +31,9 @@ Begin
   /* >> Инициализация параметров */
 %s
   /* << Инициализация параметров */
-  %s
+  
   owa.init_cgi_env(l_num_params, l_param_name, l_param_val);
+  %s
 %s
   %s(%s);
   %s
